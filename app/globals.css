@@ -1,26 +1,145 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * App chrome colors, mapped from Sarvam's product design tokens (Tatva): neutral surfaces,
+ * Sarvam indigo as the primary color, and Tatva's danger/warning colors.
+ * Slides are styled only by their deck theme (`--slide-*`), never by these.
+ */
+:root {
+  --background: rgb(245 245 245);
+  --foreground: rgb(20 20 20);
+  --card: rgb(255 255 255);
+  --card-foreground: rgb(20 20 20);
+  --popover: rgb(255 255 255);
+  --popover-foreground: rgb(20 20 20);
+  --primary: rgb(66 80 213);
+  --primary-foreground: rgb(255 255 255);
+  --secondary: rgb(240 240 240);
+  --secondary-foreground: rgb(20 20 20);
+  --muted: rgb(240 240 240);
+  --muted-foreground: rgb(82 82 82);
+  --accent: rgb(240 240 240);
+  --accent-foreground: rgb(20 20 20);
+  --destructive: rgb(184 21 20);
+  --destructive-foreground: rgb(255 255 255);
+  --warning: rgb(255 248 230);
+  /* Tatva's warning content, darkened to reach 4.5:1 on the warning background. */
+  --warning-foreground: rgb(140 98 30);
+  --border: rgb(230 230 230);
+  /* Darker than Tatva's borders so form fields meet 3:1 non-text contrast. */
+  --input: rgb(140 140 140);
+  --ring: rgb(66 80 213);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: rgb(18 18 18);
+  --foreground: rgb(228 228 228);
+  --card: rgb(30 30 30);
+  --card-foreground: rgb(228 228 228);
+  --popover: rgb(36 36 36);
+  --popover-foreground: rgb(228 228 228);
+  --primary: rgb(124 150 230);
+  --primary-foreground: rgb(20 20 20);
+  --secondary: rgb(52 52 52);
+  --secondary-foreground: rgb(228 228 228);
+  --muted: rgb(44 44 44);
+  --muted-foreground: rgb(148 148 148);
+  --accent: rgb(48 48 48);
+  --accent-foreground: rgb(228 228 228);
+  --destructive: rgb(248 81 73);
+  --destructive-foreground: rgb(20 20 20);
+  --warning: rgb(39 31 0);
+  --warning-foreground: rgb(210 153 34);
+  --border: rgb(52 52 52);
+  --input: rgb(110 110 110);
+  --ring: rgb(124 150 230);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

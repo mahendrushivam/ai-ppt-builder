@@ -1,0 +1,91 @@
+# Dependencies
+
+node_modules/
+
+# Next.js generated files
+
+.next/
+out/
+dist/
+build/
+
+# Build/cache artifacts
+
+.turbo/
+.cache/
+.vite/
+
+# Test/coverage output
+
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Logs
+
+\*.log
+logs/
+
+# Environment and secrets
+
+.env
+.env.\*
+!.env.example
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+
+.idea/
+.vscode/
+_.swp
+_.swo
+
+# Git metadata
+
+.git/
+
+# Claude temporary metadata
+
+.claude/worktrees/
+.claude/cache/
+
+# Temporary files
+
+tmp/
+temp/
+_.tmp
+_.temp
+
+# Generated assets
+
+public/generated/
+public/uploads/
+
+# Large/binary files
+
+_.zip
+_.tar
+_.gz
+_.7z
+_.mp4
+_.mov
+_.avi
+_.mkv
+_.psd
+_.ai
+\*.sketch
+
+# Source maps
+
+\*.map
+
+# Documents/binary references that are not source code
+
+_.pdf
+_.doc
+\*.docx
