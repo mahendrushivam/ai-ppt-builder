@@ -1,13 +1,13 @@
-import { buttonClassName } from "@/components/ui/Button";
+import { buttonClassName } from "@/design-system/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/design-system/components/dropdown-menu";
 import type { SlideLayout } from "@/features/deck/types";
 import { SLIDE_LAYOUTS } from "@/features/deck/utils/schema";
-import { LAYOUT_LABELS } from "../utils/slide-editing";
+import { LAYOUT_LABELS } from "@/features/deck/utils/labels";
 
 type AddSlideMenuProps = {
   onAdd: (layout: SlideLayout) => void;

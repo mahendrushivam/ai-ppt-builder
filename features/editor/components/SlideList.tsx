@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/design-system/components/button";
 import type { Deck, Slide, SlideLayout } from "@/features/deck/types";
 import { SlideRenderer } from "@/features/renderer/components/SlideRenderer";
 import { THEMES } from "@/features/themes/utils/themes";

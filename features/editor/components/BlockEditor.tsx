@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/Button";
-import { Field, fieldClassName } from "@/components/ui/Field";
+import { Button } from "@/design-system/components/button";
+import { Field, fieldClassName } from "@/design-system/components/field";
 import { type Block, BlockType } from "@/features/deck/types";
 import { LIMITS } from "@/features/deck/utils/schema";
 import { bulletsToText, editFieldId, textToBullets } from "../utils/slide-editing";

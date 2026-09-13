@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { SARVAM_CHAT_URL } from "@/features/ai/services/sarvam-client";
+import { SARVAM_CHAT_URL } from "@/services/ai/api/sarvam-client";
 import { server } from "./server";
 
 type SarvamStreamPart =

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { fieldClassName } from "@/components/ui/Field";
-import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/design-system/components/button";
+import { fieldClassName } from "@/design-system/components/field";
+import { Notice } from "@/design-system/components/notice";
 import { ChatState, useChat } from "../hooks/use-chat";
 import { AiPhase, type ChatEntry } from "../types";
 import { CHAT_LIMITS } from "../utils/stream-protocol";

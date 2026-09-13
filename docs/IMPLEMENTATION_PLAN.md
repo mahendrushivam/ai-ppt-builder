@@ -31,6 +31,7 @@ These were checked against the real services, not assumed from docs.
 | Sarvam reasoning | Reasoning is on by default; a trivial edit used **~600–1000 completion tokens** of reasoning, `content` was empty | Budget `max_tokens` for reasoning; keep each call's output small |
 | Sarvam streaming + tools | Streams `delta.reasoning_content` first, then OpenAI-style `delta.tool_calls` fragments (`index`, `id`+`name` on first chunk, `arguments` string fragments), then `finish_reason`, then `data: [DONE]` | Server can emit each slide as soon as its tool call completes |
 | Sarvam limits | 128K context; max output 4096 tokens (Starter); 40 req/min on `sarvam-105b`; `stream_options`/`max_completion_tokens` unsupported | One slide per generation call; retry with backoff on 429/503 |
+| Sarvam forced tool calls (checked 2026-09-14) | `tool_choice` naming a tool, and `"required"`, both returned the forced call with valid arguments in ~2–3s with reasoning off. With low reasoning the same outline request spent all 4096 output tokens reasoning (21s) and never called the tool | Generation calls force their tool with reasoning off |
 | Images | Openverse `GET /v1/images/?q=` works **without a key**; returns `url`, `thumbnail`, `license`, `creator`, `attribution` | Model supplies an image *query*, server resolves it to a real URL |
 | Hosting | Vercel Hobby: 300s max function duration (includes streamed response), 4.5MB body limit | Generation must finish < 300s; set `maxDuration` |
 | Next 16 | Route Handlers use Web `Request`/`Response`; POST handlers never cached; `maxDuration` route segment config exists | Streaming route handlers, no caching config needed |
@@ -392,7 +393,7 @@ app/
   api/ai/generate/route.ts          export const maxDuration = 300
   api/ai/chat/route.ts
 
-Follows `.claude/rules/architecture.md`: `features/<feature>/{components,hooks,services,utils}/` + `types.ts`.
+Follows `.claude/rules/architecture.md`: `features/<feature>/{components,hooks,utils}/` + `types.ts`, with code that talks to external systems in the top-level `services/` folder.
 Folders are only created when a phase needs them. The tree below shows the target shape.
 
 features/
@@ -411,7 +412,6 @@ features/
   decks/                            deck management (kept separate from slide editing)
     components/                     DeckList, CreateDeckButton, RenameDeckDialog
     hooks/                          useDecksStore (Zustand: all decks + active deck id)
-    services/deck-storage.ts        localStorage read/write + validation
 
   editor/
     components/                     Workspace, SlideList, SlideCanvas, SlideRenderer (pure),
@@ -425,13 +425,6 @@ features/
       deck-context.ts               serializeDeckForModel                  (Phase 1)
       tool-call-accumulator.ts      streamed tool-call fragments → complete calls
       stream-protocol.ts            AiStreamEvent schema + NDJSON line parsing
-    services/
-      sarvam-client.ts              server-only: fetch, SSE parsing, backoff, abort
-      tools.ts                      server-only: tool definitions generated from zod
-      agent.ts                      server-only: chat tool loop + prompts
-      generate-slides.ts            server-only: outline + sequential per-slide generation
-      images.ts                     server-only: Openverse resolver
-      ai-api.ts                     browser: POST + NDJSON stream reader
     hooks/                          useChat, useGeneration
     components/                     ChatPanel, PromptForm, OutlineReview, GenerationProgress
 
@@ -439,9 +432,22 @@ features/
     components/PrintDeck.tsx
     print.css
 
-components/ui/                      only genuinely shared primitives (Button, IconButton, …)
+services/                           external systems, shared across features
+  ai/
+    agents/chat-agent.ts            server-only: chat tool loop + prompts
+    agents/generate-slides.ts       server-only: outline + sequential per-slide generation (planned)
+    tools/slide-tools.ts            server-only: tool definitions generated from zod
+    api/sarvam-client.ts            server-only: fetch, retries with backoff, abort
+    api/api.ts                      browser: POST + NDJSON stream reader
+  images/openverse.ts               server-only: Openverse image resolver (planned)
+  localStorage/
+    decks.ts                        decks read/write + validation
+    chat.ts                         chat history per deck
+
+design-system/components/<name>/index.tsx   only genuinely shared primitives (button, field, notice, …)
+theme/color-mode-menu/index.tsx     app light/dark/system switch (slide themes stay in features/themes)
 lib/env.ts                          server env validation (SARVAM_API_KEY)
-test/                               vitest setup, MSW server + handlers, recorded Sarvam fixtures
+testing/                            vitest setup, MSW server + handlers, recorded Sarvam fixtures
 ```
 
 Tests live next to the code they test (`*.test.ts(x)`).

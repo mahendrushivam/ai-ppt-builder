@@ -20,7 +20,7 @@ import {
   tableFields,
   tableShapeIssues,
 } from "@/features/deck/utils/schema";
-import type { BlockInput, ColumnInput, SlideInput, SlidePatchInput } from "../types";
+import { type BlockInput, type ColumnInput, type SlideInput, type SlidePatchInput, SlideVisual } from "../types";
 
 /*
  * Model-facing input schemas. The model never supplies ids, revisions or image URLs:
@@ -81,6 +81,27 @@ export const slidePatchInputSchema = z.object({
   columns: columnsInputSchema.optional(),
   notes: z.string().trim().max(LIMITS.notes).optional(),
   hints: hintsInputSchema.optional(),
+});
+
+/** Limits for generating a deck from a prompt. They also keep the cost of one request bounded. */
+export const GENERATION_LIMITS = {
+  prompt: 2000,
+  maxSlides: 12,
+  keyPointsPerSlide: 6,
+  keyPoint: 160,
+} as const;
+
+/** One planned slide. The user reviews and edits the outline before any slide is generated. */
+export const outlineItemSchema = z.object({
+  title: requiredText(LIMITS.slideTitle),
+  layout: slideLayoutSchema,
+  keyPoints: z.array(requiredText(GENERATION_LIMITS.keyPoint)).max(GENERATION_LIMITS.keyPointsPerSlide).default([]),
+  visual: z.enum(SlideVisual).default(SlideVisual.None),
+});
+
+export const outlineSchema = z.object({
+  deckTitle: requiredText(LIMITS.deckTitle),
+  slides: z.array(outlineItemSchema).min(1).max(GENERATION_LIMITS.maxSlides),
 });
 
 export function materializeSlide(input: SlideInput): Slide {

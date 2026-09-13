@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { type AssembledToolCall, mergeToolCallDeltas, readSarvamChunks } from "../sarvam-stream";
+import { type AssembledToolCall, collectCompletion, mergeToolCallDeltas, readSarvamChunks } from "../sarvam-stream";
 
 // Vitest runs from the project root.
 const recording = readFileSync(join(process.cwd(), "testing/recordings/sarvam-tool-calls.sse"), "utf8");
@@ -60,5 +60,14 @@ describe("readSarvamChunks", () => {
     };
 
     await expect(consume()).rejects.toThrow("not valid JSON");
+  });
+});
+
+describe("collectCompletion", () => {
+  test("collects the tool calls and finish reason of a recorded stream", async () => {
+    const completion = await collectCompletion(readSarvamChunks(streamOf(recording)));
+
+    expect(completion.toolCalls.map((call) => call.name)).toEqual(["update_slide", "add_slide"]);
+    expect(completion.finishReason).toBe("tool_calls");
   });
 });

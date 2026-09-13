@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { fieldClassName } from "@/components/ui/Field";
+import { fieldClassName } from "@/design-system/components/field";
 import { LIMITS } from "@/features/deck/utils/schema";
 
 type DeckTitleFieldProps = {

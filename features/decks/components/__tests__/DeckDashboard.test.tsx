@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { contentSlide, deckWith } from "@/testing/fixtures";
 import { routerMock } from "@/testing/mocks/next-navigation";
 import { useDecksStore } from "../../hooks/use-decks-store";
-import { DECKS_STORAGE_KEY, loadDecks, saveDecks } from "../../services/deck-storage";
+import { DECKS_STORAGE_KEY, loadDecks, saveDecks } from "@/services/localStorage/decks";
 import { DeckDashboard } from "../DeckDashboard";
 import { DeckPersistence } from "../DeckPersistence";
 

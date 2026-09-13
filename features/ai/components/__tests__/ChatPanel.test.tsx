@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import type { Deck } from "@/features/deck/types";
 import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
 import { contentSlide, deckWith } from "@/testing/fixtures";
-import { mockChatRoute, mockOpenChatStream } from "@/testing/msw/chat";
+import { mockChatRoute, mockOpenChatStream } from "@/testing/msw/ai-routes";
 import { seedDecks } from "@/testing/stores";
 import { AiErrorCode, AiPhase, type AiStreamEvent, AiStreamEventType } from "../../types";
 import { ChatPanel } from "../ChatPanel";

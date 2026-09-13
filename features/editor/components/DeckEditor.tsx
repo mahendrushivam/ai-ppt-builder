@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import { flushSync } from "react-dom";
-import { ColorModeMenu } from "@/components/ColorModeMenu";
-import { buttonClassName } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Notice } from "@/components/ui/Notice";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ColorModeMenu } from "@/theme/color-mode-menu";
+import { buttonClassName } from "@/design-system/components/button";
+import { ConfirmDialog } from "@/design-system/components/confirm-dialog";
+import { Notice } from "@/design-system/components/notice";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/components/tabs";
 import { ChatPanel } from "@/features/ai/components/ChatPanel";
+import { DeckGenerator } from "@/features/ai/components/DeckGenerator";
+import { GenerationProgress } from "@/features/ai/components/GenerationProgress";
+import { GenerationStep, useGeneration } from "@/features/ai/hooks/use-generation";
 import type { Slide, SlideLayout } from "@/features/deck/types";
 import { DeckTitleField } from "@/features/decks/components/DeckTitleField";
 import { DecksStatus, useDecksStore } from "@/features/decks/hooks/use-decks-store";
@@ -31,6 +34,7 @@ export function DeckEditor({ deckId }: { deckId: string }) {
   const [sidePanel, setSidePanel] = useState<"chat" | "slide">("chat");
   const [actionError, setActionError] = useState<string | null>(null);
   const actions = useSlideActions(deckId, setActionError);
+  const generation = useGeneration(deckId);
 
   if (status === DecksStatus.Loading) {
     return (
@@ -61,6 +65,13 @@ export function DeckEditor({ deckId }: { deckId: string }) {
 
   // Settings need a slide to show, so the chat is shown whenever nothing is selected.
   const activePanel = selectedSlide ? sidePanel : "chat";
+
+  // Planning replaces the canvas; while slides are generated they are shown as they arrive.
+  const { step } = generation.state;
+  const isPlanning =
+    step === GenerationStep.DraftingOutline ||
+    step === GenerationStep.ReviewingOutline ||
+    (step === GenerationStep.Prompt && slides.length === 0);
 
   function addSlide(layout: SlideLayout) {
     const slideId = actions.addSlide(layout, selectedSlide?.id ?? null);
@@ -124,20 +135,22 @@ export function DeckEditor({ deckId }: { deckId: string }) {
         </aside>
 
         <main className="min-h-0 flex-1 overflow-auto p-6">
-          {selectedSlide ? (
-            <SlideCanvas
-              slide={selectedSlide}
-              theme={theme}
-              onEditTarget={editTarget}
+          {generation.state.step === GenerationStep.Generating && (
+            <GenerationProgress
+              progress={generation.state}
+              onStop={generation.cancel}
+              onRetrySlide={(index) => void generation.retrySlide(index)}
+              onResume={() => void generation.resume()}
+              onDismiss={generation.dismiss}
+            />
+          )}
+          {isPlanning ? (
+            <DeckGenerator
+              generation={generation}
+              blankSlideAction={<AddSlideMenu onAdd={addSlide} label="Add first slide" />}
             />
           ) : (
-            <div className="mx-auto mt-16 max-w-md rounded-xl border border-dashed border-input bg-card px-6 py-12 text-center">
-              <h2 className="text-lg font-medium">This presentation has no slides</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Add a slide to start editing.</p>
-              <div className="mt-6 flex justify-center">
-                <AddSlideMenu onAdd={addSlide} label="Add first slide" />
-              </div>
-            </div>
+            selectedSlide && <SlideCanvas slide={selectedSlide} theme={theme} onEditTarget={editTarget} />
           )}
         </main>
 

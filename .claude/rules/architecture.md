@@ -18,12 +18,24 @@ For substantial features prefer:
 features/<feature>/
 components/
 hooks/
-services/
 utils/
 types.ts
 
-Use shared `components/`, `hooks/`, `lib/`, and `types/` only when code is
+Code that talks to external systems (AI providers, browser storage, other APIs)
+lives in the top-level `services/` folder, grouped by system rather than by feature:
+
+services/
+ai/ → agents/, tools/, api/
+localStorage/ → one file per stored data set (decks.ts, chat.ts)
+
+Use shared `design-system/`, `hooks/`, `lib/`, and `types/` only when code is
 genuinely reusable.
+
+Shared UI primitives live in `design-system/components/<name>/index.tsx`. Split a component's
+variables, types or utils into separate files in that folder only when the file is large.
+
+App-wide theming (light/dark mode) lives in the top-level `theme/` folder, next to
+`services/`, e.g. `theme/color-mode-menu/index.tsx`. Slide themes stay in `features/themes/`.
 
 ## Rules
 

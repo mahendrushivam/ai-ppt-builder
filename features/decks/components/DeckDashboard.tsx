@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ColorModeMenu } from "@/components/ColorModeMenu";
-import { Button } from "@/components/ui/Button";
-import { Notice } from "@/components/ui/Notice";
+import { ColorModeMenu } from "@/theme/color-mode-menu";
+import { Button } from "@/design-system/components/button";
+import { Notice } from "@/design-system/components/notice";
 import type { Deck } from "@/features/deck/types";
 import { DecksStatus, useDecksStore } from "../hooks/use-decks-store";
 import { DeckCard } from "./DeckCard";

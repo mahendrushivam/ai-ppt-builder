@@ -61,6 +61,21 @@ export async function* readSarvamChunks(body: ReadableStream<Uint8Array>): Async
   }
 }
 
+export type CompletionResult = { content: string; toolCalls: AssembledToolCall[]; finishReason: string | null };
+
+/** Reads a whole streamed completion, for calls whose result is only used once it is complete. */
+export async function collectCompletion(chunks: AsyncIterable<SarvamChunk>): Promise<CompletionResult> {
+  const result: CompletionResult = { content: "", toolCalls: [], finishReason: null };
+  for await (const chunk of chunks) {
+    for (const { delta, finish_reason: finishReason } of chunk.choices) {
+      if (delta?.tool_calls) result.toolCalls = mergeToolCallDeltas(result.toolCalls, delta.tool_calls);
+      result.content += delta?.content ?? "";
+      if (finishReason) result.finishReason = finishReason;
+    }
+  }
+  return result;
+}
+
 /** Adds streamed fragments to the tool calls assembled so far, matching fragments by `index`. */
 export function mergeToolCallDeltas(calls: AssembledToolCall[], deltas: ToolCallDelta[]): AssembledToolCall[] {
   const merged = [...calls];

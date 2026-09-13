@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/Button";
-import { fieldClassName } from "@/components/ui/Field";
+import { Button } from "@/design-system/components/button";
+import { fieldClassName } from "@/design-system/components/field";
 import type { BlockOfType, BlockType } from "@/features/deck/types";
 import { LIMITS } from "@/features/deck/utils/schema";
 import {

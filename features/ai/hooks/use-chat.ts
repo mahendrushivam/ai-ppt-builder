@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { type DeckOperation, type OperationFailure, OperationFailureCode } from "@/features/deck/types";
 import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
-import { AiRequestError, streamChat } from "../services/ai-api";
-import { loadChat, saveChat } from "../services/chat-storage";
+import { AiRequestError, streamChat } from "@/services/ai/api/api";
+import { loadChat, saveChat } from "@/services/localStorage/chat";
 import { type AiPhase, AiStreamEventType, type ChatEntry, type ChatHistoryMessage } from "../types";
 import { CHAT_LIMITS } from "../utils/stream-protocol";
 

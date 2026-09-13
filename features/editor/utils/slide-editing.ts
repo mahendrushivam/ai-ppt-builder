@@ -2,14 +2,6 @@ import { type Block, BlockType, type BulletItem, type Column, type Slide, type S
 import { createBlankSlide, createId } from "@/features/deck/utils/create";
 import { LAYOUT_COLUMN_COUNT } from "@/features/deck/utils/schema";
 
-export const LAYOUT_LABELS: Record<SlideLayout, string> = {
-  title: "Title",
-  section: "Section header",
-  content: "Content",
-  "two-column": "Two columns",
-  comparison: "Comparison",
-};
-
 /** Blocks the editor can add by hand. Charts and images are only created by the AI for now. */
 export type NewBlockType = BlockType.Bullets | BlockType.Paragraph | BlockType.Table;
 

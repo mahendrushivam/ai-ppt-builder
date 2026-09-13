@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { loadDecks, saveDecks } from "../services/deck-storage";
+import { loadDecks, saveDecks } from "@/services/localStorage/decks";
 import { DecksStatus, useDecksStore } from "./use-decks-store";
 
 const SAVE_DELAY_MS = 300;

@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Field, fieldClassName } from "@/components/ui/Field";
+import { Button } from "@/design-system/components/button";
+import { ConfirmDialog } from "@/design-system/components/confirm-dialog";
+import { Field, fieldClassName } from "@/design-system/components/field";
 import { BlockType, type Slide, type SlideLayout, type SlidePatch } from "@/features/deck/types";
 import { LIMITS, SLIDE_LAYOUTS } from "@/features/deck/utils/schema";
 import type { SlideActions } from "../hooks/use-slide-actions";
+import { LAYOUT_LABELS } from "@/features/deck/utils/labels";
 import {
   appendBlock,
   createBlock,
   editFieldId,
-  LAYOUT_LABELS,
   layoutChangeRemovesContent,
   NEW_BLOCK_LABELS,
   removeBlock,

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Button } from "@/design-system/components/button";
+import { ConfirmDialog } from "@/design-system/components/confirm-dialog";
 import type { Deck } from "@/features/deck/types";
 import { SlideRenderer } from "@/features/renderer/components/SlideRenderer";
 import { themeStyle } from "@/features/themes/utils/theme-style";

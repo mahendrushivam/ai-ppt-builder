@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { type Deck, type DeckOperation, OperationFailureCode, type OperationResult } from "@/features/deck/types";
 import { createDeck } from "@/features/deck/utils/create";
 import { applyOperation as applyOperationToDeck } from "@/features/deck/utils/operations";
-import type { LoadDecksResult } from "../services/deck-storage";
+import type { LoadDecksResult } from "@/services/localStorage/decks";
 
 export enum DecksStatus {
   /** Saved decks have not been read from browser storage yet. */

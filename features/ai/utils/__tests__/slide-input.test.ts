@@ -4,9 +4,12 @@ import { BlockType, type Slide } from "@/features/deck/types";
 import { createBlankSlide, createDeck } from "@/features/deck/utils/create";
 import { applyOperation } from "@/features/deck/utils/operations";
 import { slideSchema } from "@/features/deck/utils/schema";
+import { SlideVisual } from "../../types";
 import {
+  GENERATION_LIMITS,
   materializeSlide,
   materializeSlidePatch,
+  outlineSchema,
   slideInputSchema,
   slidePatchInputSchema,
 } from "../slide-input";
@@ -162,5 +165,18 @@ describe("materializeSlidePatch", () => {
     expect(updated.title).toBe("Our team");
     expect(updated.hints).toEqual({ align: "center", columnRatio: "1:1" });
     expect(updated.columns).toBe(current.columns);
+  });
+});
+
+describe("outlineSchema", () => {
+  test("fills in defaults and rejects outlines with no slides or too many", () => {
+    expect(outlineSchema.parse({ deckTitle: " Q3 ", slides: [{ title: "Intro", layout: "title" }] })).toEqual({
+      deckTitle: "Q3",
+      slides: [{ title: "Intro", layout: "title", keyPoints: [], visual: SlideVisual.None }],
+    });
+
+    const tooMany = Array.from({ length: GENERATION_LIMITS.maxSlides + 1 }, () => ({ title: "Slide", layout: "content" }));
+    expect(outlineSchema.safeParse({ deckTitle: "Q3", slides: [] }).success).toBe(false);
+    expect(outlineSchema.safeParse({ deckTitle: "Q3", slides: tooMany }).success).toBe(false);
   });
 });
