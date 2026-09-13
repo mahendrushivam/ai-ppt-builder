@@ -1,4 +1,5 @@
-import { eventStreamResponse, generateRequestSchema, parseRequestBody } from "@/features/ai/utils/stream-protocol";
+import { eventStreamResponse, generateRequestSchema } from "@/features/ai/utils/stream-protocol";
+import { parseRequestBody } from "@/lib/request";
 import { generateSlides } from "@/services/ai/agents/slide-generator";
 
 /** Vercel Hobby's limit. Slides are generated one at a time, a few seconds each, for at most 12 slides. */

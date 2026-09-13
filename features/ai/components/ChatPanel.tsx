@@ -16,6 +16,7 @@ const PHASE_LABELS: Record<AiPhase, string> = {
   [AiPhase.Thinking]: "Thinking…",
   [AiPhase.UpdatingSlides]: "Updating slides…",
   [AiPhase.ApplyingChanges]: "Applying changes…",
+  [AiPhase.AddingImages]: "Adding images…",
   [AiPhase.WritingReply]: "Writing reply…",
 };
 

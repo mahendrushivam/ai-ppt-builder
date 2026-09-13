@@ -9,6 +9,9 @@ import {
   SlideVisual,
 } from "@/features/ai/types";
 import { BlockType } from "@/features/deck/types";
+import type { FindImage } from "@/services/images/openverse";
+import { ImageSearchStatus } from "@/services/images/types";
+import { resolvedImage } from "@/testing/fixtures";
 import { mockSarvamRounds, sarvamSse } from "@/testing/msw/sarvam";
 import { server } from "@/testing/msw/server";
 import { SARVAM_CHAT_URL } from "../../api/sarvam-client";
@@ -22,8 +25,11 @@ const outline: Outline = {
     { title: "Themes", layout: "content", keyPoints: ["Speed", "Quality"], visual: SlideVisual.None },
     { title: "Timeline", layout: "content", keyPoints: ["July to September"], visual: SlideVisual.None },
     { title: "Pricing", layout: "content", keyPoints: ["Starter", "Pro"], visual: SlideVisual.Table },
+    { title: "Our team", layout: "content", keyPoints: [], visual: SlideVisual.Image },
   ],
 };
+
+const findNothing: FindImage = async () => ({ status: ImageSearchStatus.NotFound });
 
 const titleSlideInput = { layout: "title", title: "Q3 Roadmap", subtitle: "Product team" };
 const themesSlideInput = {
@@ -44,7 +50,7 @@ function slideRound(slide: unknown, callId = "call_slide") {
   ]);
 }
 
-async function generate(outlineIndexes: number[]) {
+async function generate(outlineIndexes: number[], findImage: FindImage = findNothing) {
   const events: AiStreamEvent[] = [];
   await generateSlides({
     prompt: "Our Q3 product roadmap",
@@ -54,6 +60,7 @@ async function generate(outlineIndexes: number[]) {
     signal: new AbortController().signal,
     emit: (event) => events.push(event),
     retryDelayMs: 0,
+    findImage,
   });
   return events;
 }
@@ -150,6 +157,24 @@ describe("generateSlides", () => {
 
     expect(addedSlidesOf(events)[0].slide.columns[0].blocks[0].type).toBe(BlockType.Table);
     expect(JSON.stringify(requests[1])).toContain("Add a table block");
+  });
+
+  test("fills in images for image blocks before the slide is sent", async () => {
+    const teamSlideInput = {
+      layout: "content",
+      title: "Our team",
+      columns: [{ blocks: [{ type: "image", query: "product team planning", alt: "The product team" }] }],
+    };
+    mockSarvamRounds(slideRound(teamSlideInput));
+    const searches: string[] = [];
+
+    const events = await generate([4], async (query) => {
+      searches.push(query);
+      return { status: ImageSearchStatus.Found, image: resolvedImage };
+    });
+
+    expect(searches).toEqual(["product team planning"]);
+    expect(addedSlidesOf(events)[0].slide.columns[0].blocks[0]).toMatchObject({ type: BlockType.Image, image: resolvedImage });
   });
 
   test("stops with a retryable error when the AI service is rate limited", async () => {

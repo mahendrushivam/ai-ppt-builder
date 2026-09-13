@@ -1,4 +1,5 @@
-import { outlineRequestSchema, parseRequestBody } from "@/features/ai/utils/stream-protocol";
+import { outlineRequestSchema } from "@/features/ai/utils/stream-protocol";
+import { parseRequestBody } from "@/lib/request";
 import { createOutline } from "@/services/ai/agents/outline-agent";
 
 /** One model call, plus a correction round and provider retries in the worst case. */

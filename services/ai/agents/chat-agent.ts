@@ -5,6 +5,7 @@ import { AiErrorCode, AiPhase, type AiStreamEvent, AiStreamEventType, type ChatH
 import { serializeDeckForModel } from "@/features/ai/utils/deck-context";
 import { type CompletionResult, mergeToolCallDeltas, type SarvamChunk } from "@/features/ai/utils/sarvam-stream";
 import { type SarvamMessage, streamCompletion } from "../api/sarvam-client";
+import { type FindImage, findImage as findOpenverseImage } from "@/services/images/openverse";
 import { CHAT_TOOLS, ChatToolName, executeToolCall } from "../tools/slide-tools";
 import { describeAiFailure } from "./errors";
 
@@ -23,6 +24,8 @@ type ChatTurnOptions = {
   signal: AbortSignal;
   emit: Emit;
   retryDelayMs?: number;
+  /** Image search for image blocks the AI adds. */
+  findImage?: FindImage;
 };
 
 /**
@@ -42,7 +45,15 @@ export async function runChatTurn(options: ChatTurnOptions): Promise<void> {
   }
 }
 
-async function runRounds({ deck, messages, selectedSlideId, signal, emit, retryDelayMs }: ChatTurnOptions) {
+async function runRounds({
+  deck,
+  messages,
+  selectedSlideId,
+  signal,
+  emit,
+  retryDelayMs,
+  findImage = findOpenverseImage,
+}: ChatTurnOptions) {
   let workingDeck = deck;
   const appliedSummaries: string[] = [];
   let previousRoundNeedsCorrection = false;
@@ -111,6 +122,14 @@ async function runRounds({ deck, messages, selectedSlideId, signal, emit, retryD
     }
 
     emit({ type: AiStreamEventType.Status, phase: AiPhase.ApplyingChanges });
+    let announcedImages = false;
+    const findImageWithStatus: FindImage = (query, searchSignal) => {
+      if (!announcedImages) {
+        announcedImages = true;
+        emit({ type: AiStreamEventType.Status, phase: AiPhase.AddingImages });
+      }
+      return findImage(query, searchSignal);
+    };
     const calls = response.toolCalls.map((call, index) => ({ ...call, id: call.id || `call_${round}_${index}` }));
     const toolResults: SarvamMessage[] = [];
     previousRoundNeedsCorrection = false;
@@ -120,7 +139,10 @@ async function runRounds({ deck, messages, selectedSlideId, signal, emit, retryD
       if (appliedSummaries.length >= MAX_OPERATIONS_PER_TURN) {
         result = `Error: not applied. The limit of ${MAX_OPERATIONS_PER_TURN} changes per request was reached.`;
       } else {
-        const execution = executeToolCall(workingDeck, call.name, call.arguments);
+        const execution = await executeToolCall(workingDeck, call.name, call.arguments, {
+          findImage: findImageWithStatus,
+          signal,
+        });
         if (execution.ok) {
           workingDeck = execution.deck;
           appliedSummaries.push(execution.summary);
@@ -218,6 +240,7 @@ function buildSystemPrompt(deck: Deck, selectedSlideId: string | null): string {
     '- Layouts: "title" and "section" have no columns, "content" has 1 column, "two-column" and "comparison" have 2 columns (comparison columns have headings).',
     `- Content is plain text without markdown. Limits: ${LIMITS.bulletsPerBlock} bullets per block, ${LIMITS.blocksPerColumn} blocks per column, ${LIMITS.slideTitle} characters per title, ${LIMITS.slidesPerDeck} slides per deck.`,
     "- Every table row needs as many cells as the header. Every chart series needs one value per category.",
+    "- Pick the chart type that fits the data; the chartType description says how each type reads the series.",
     "- If a tool returns an error, fix the arguments and call the tool again.",
     "- The deck below already includes your successful changes. Don't repeat them; once the request is done, stop calling tools.",
     "- Never claim a change you did not make with a tool. When finished, reply in one or two short sentences describing the changes that succeeded (tool results starting with Added, Updated, Changed, Moved or Deleted). Refer to slides by number, never by id.",

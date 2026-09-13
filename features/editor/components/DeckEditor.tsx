@@ -15,6 +15,7 @@ import { GenerationStep, useGeneration } from "@/features/ai/hooks/use-generatio
 import type { Slide, SlideLayout } from "@/features/deck/types";
 import { DeckTitleField } from "@/features/decks/components/DeckTitleField";
 import { DecksStatus, useDecksStore } from "@/features/decks/hooks/use-decks-store";
+import { ExportMenu } from "@/features/export/components/ExportMenu";
 import { ThemeSelector } from "@/features/themes/components/ThemeSelector";
 import { THEMES } from "@/features/themes/utils/themes";
 import { useSlideActions } from "../hooks/use-slide-actions";
@@ -106,6 +107,7 @@ export function DeckEditor({ deckId }: { deckId: string }) {
           className="max-w-md min-w-40 flex-1 font-medium"
         />
         <div className="ml-auto flex items-center gap-3">
+          <ExportMenu deck={deck} slide={selectedSlide} slideNumber={selectedIndex + 1} onError={setActionError} />
           <ThemeSelector value={deck.themeId} onChange={(themeId) => actions.setTheme(themeId)} />
           <ColorModeMenu />
         </div>
@@ -150,7 +152,14 @@ export function DeckEditor({ deckId }: { deckId: string }) {
               blankSlideAction={<AddSlideMenu onAdd={addSlide} label="Add first slide" />}
             />
           ) : (
-            selectedSlide && <SlideCanvas slide={selectedSlide} theme={theme} onEditTarget={editTarget} />
+            selectedSlide && (
+              <SlideCanvas
+                slide={selectedSlide}
+                theme={theme}
+                onEditTarget={editTarget}
+                onChangeColumns={(columns) => actions.updateSlide(selectedSlide.id, { columns })}
+              />
+            )
           )}
         </main>
 

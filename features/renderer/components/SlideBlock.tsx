@@ -1,9 +1,20 @@
-import { type Block, BlockType } from "@/features/deck/types";
+import { type Block, BlockType, type ResolvedImage } from "@/features/deck/types";
+import { CHART_TYPE_LABELS } from "@/features/deck/utils/labels";
+import { ImageUrlStatus, useImageUrl } from "../hooks/use-image-url";
+import { SlideChart } from "./SlideChart";
 
-const CHART_LABELS = { bar: "Bar", line: "Line", pie: "Pie" } as const;
+/** How images load: `lazy` on screen, `eager` for print and export, where every image must be ready. */
+export type ImageLoading = "lazy" | "eager";
+
+type SlideBlockProps = {
+  block: Block;
+  /** Series colors from the deck theme. */
+  chartColors: readonly string[];
+  imageLoading: ImageLoading;
+};
 
 /** Read-only rendering of one content block. Empty content shows a faint placeholder. */
-export function SlideBlock({ block }: { block: Block }) {
+export function SlideBlock({ block, chartColors, imageLoading }: SlideBlockProps) {
   const editTarget = `block-${block.id}`;
 
   switch (block.type) {
@@ -70,49 +81,80 @@ export function SlideBlock({ block }: { block: Block }) {
       );
 
     case BlockType.Chart:
-      // Placeholder until chart rendering is implemented in the rich-content phase.
       return (
-        <div
-          data-edit-target={editTarget}
-          role="img"
-          aria-label={`${CHART_LABELS[block.chartType]} chart: ${block.title ?? "untitled"}`}
-          className="flex min-h-[10cqw] flex-1 flex-col items-center justify-center [background:var(--slide-surface)] rounded-(--slide-radius) text-(--slide-muted) [font-size:var(--slide-body-size)]"
-        >
-          <span className="font-semibold text-(--slide-text)">{block.title ?? "Chart"}</span>
-          <span>
-            {CHART_LABELS[block.chartType]} chart · {block.categories.length} categories
-          </span>
-        </div>
+        <figure data-edit-target={editTarget} className="flex min-h-[14cqw] flex-1 flex-col gap-[0.4cqw]">
+          {block.title && (
+            <figcaption className="font-semibold text-(--slide-text) text-[calc(var(--slide-body-size)*0.8)]">
+              {block.title}
+            </figcaption>
+          )}
+          <div
+            role="img"
+            aria-label={`${CHART_TYPE_LABELS[block.chartType]} chart: ${block.title ?? "untitled"}`}
+            className="min-h-0 flex-1"
+          >
+            <SlideChart chart={block} colors={chartColors} />
+          </div>
+        </figure>
       );
 
     case BlockType.Image:
-      if (!block.image) {
-        return (
-          <div
-            data-edit-target={editTarget}
-            role="img"
-            aria-label={block.alt}
-            className="flex min-h-[10cqw] flex-1 items-center justify-center border-2 border-dashed px-[1cqw] text-center border-(--slide-border) rounded-(--slide-radius) text-(--slide-muted) [font-size:var(--slide-body-size)]"
-          >
-            Image: {block.alt}
-          </div>
-        );
-      }
-      return (
-        <figure data-edit-target={editTarget} className="flex min-h-0 flex-1 flex-col gap-[0.4cqw]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- images come from arbitrary hosts that next/image remotePatterns cannot enumerate */}
-          <img
-            src={block.image.src}
-            alt={block.alt}
-            loading="lazy"
-            className="min-h-0 w-full flex-1 object-cover rounded-(--slide-radius)"
-          />
-          <figcaption className="truncate text-(--slide-muted) text-[calc(var(--slide-body-size)*0.5)]">
-            {block.image.attribution}
-          </figcaption>
-        </figure>
-      );
+      if (!block.image) return <ImagePlaceholder editTarget={editTarget} alt={block.alt} text={`Image: ${block.alt}`} />;
+      return <SlideImage editTarget={editTarget} image={block.image} alt={block.alt} loading={imageLoading} />;
   }
+}
+
+type SlideImageProps = { editTarget: string; image: ResolvedImage; alt: string; loading: ImageLoading };
+
+function SlideImage({ editTarget, image, alt, loading }: SlideImageProps) {
+  const url = useImageUrl(image.src);
+
+  if (url.status === ImageUrlStatus.Loading) {
+    return <ImagePlaceholder editTarget={editTarget} alt={alt} text={`Image: ${alt}`} isLoading />;
+  }
+  if (url.status === ImageUrlStatus.Missing) {
+    return (
+      <ImagePlaceholder editTarget={editTarget} alt={alt} text="This uploaded image isn't available in this browser." />
+    );
+  }
+  return (
+    <figure data-edit-target={editTarget} className="flex min-h-0 flex-1 flex-col gap-[0.4cqw]">
+      {/* eslint-disable-next-line @next/next/no-img-element -- images come from arbitrary hosts or browser storage, which next/image cannot load */}
+      <img
+        src={url.url}
+        alt={alt}
+        loading={loading}
+        className="min-h-0 w-full flex-1 object-cover rounded-(--slide-radius)"
+      />
+      {image.attribution && (
+        <figcaption className="truncate text-(--slide-muted) text-[calc(var(--slide-body-size)*0.5)]">
+          {image.attribution}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+type ImagePlaceholderProps = {
+  editTarget: string;
+  alt: string;
+  text: string;
+  /** Marks an upload still being read from storage, so exports can wait for it. */
+  isLoading?: boolean;
+};
+
+function ImagePlaceholder({ editTarget, alt, text, isLoading = false }: ImagePlaceholderProps) {
+  return (
+    <div
+      data-edit-target={editTarget}
+      data-image-loading={isLoading || undefined}
+      role="img"
+      aria-label={alt}
+      className="flex min-h-[10cqw] flex-1 items-center justify-center border-2 border-dashed px-[1cqw] text-center border-(--slide-border) rounded-(--slide-radius) text-(--slide-muted) [font-size:var(--slide-body-size)]"
+    >
+      {text}
+    </div>
+  );
 }
 
 function Placeholder({ editTarget, text }: { editTarget: string; text: string }) {

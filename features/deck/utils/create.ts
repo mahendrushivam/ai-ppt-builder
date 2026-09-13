@@ -3,7 +3,7 @@ import { DEFAULT_THEME_ID } from "@/features/themes/utils/themes";
 import type { Column, Deck, LayoutHints, Slide, SlideLayout } from "../types";
 import { LAYOUT_COLUMN_COUNT } from "./schema";
 
-type IdKind = "deck" | "slide" | "column" | "block" | "item";
+type IdKind = "deck" | "slide" | "column" | "block" | "item" | "upload";
 
 /** Short ids keep AI context compact; 48 random bits is plenty for this app. */
 export function createId(kind: IdKind): string {

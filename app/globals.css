@@ -143,3 +143,15 @@
     @apply font-sans;
   }
 }
+
+/* Printing is meant for the export view: one page per slide, at the size slides are exported. */
+@media print {
+  @page {
+    size: 1280px 720px;
+    margin: 0;
+  }
+
+  html {
+    print-color-adjust: exact;
+  }
+}

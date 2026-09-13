@@ -1,7 +1,7 @@
-import type { DeckOperation, Slide, SlideLayout, SlidePatch } from "@/features/deck/types";
+import type { Block, DeckOperation, Slide, SlideLayout, SlidePatch } from "@/features/deck/types";
 import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
 import type { ThemeId } from "@/features/themes/types";
-import { createStarterSlide } from "../utils/slide-editing";
+import { createStarterSlide, replaceBlock } from "../utils/slide-editing";
 
 /**
  * Editing commands for one deck. Each command becomes a DeckOperation, using the slide's
@@ -15,11 +15,15 @@ export function useSlideActions(deckId: string, onError: (message: string) => vo
     return result.ok;
   }
 
-  function applyToSlide(slideId: string, buildOperation: (slide: Slide) => DeckOperation): boolean {
-    const slide = useDecksStore
+  function currentSlide(slideId: string): Slide | undefined {
+    return useDecksStore
       .getState()
       .decks.find((deck) => deck.id === deckId)
       ?.slides.find((candidate) => candidate.id === slideId);
+  }
+
+  function applyToSlide(slideId: string, buildOperation: (slide: Slide) => DeckOperation): boolean {
+    const slide = currentSlide(slideId);
     if (!slide) {
       onError("That slide no longer exists.");
       return false;
@@ -39,6 +43,25 @@ export function useSlideActions(deckId: string, onError: (message: string) => vo
         slideId,
         baseRevision: slide.revision,
         patch,
+      }));
+    },
+    /**
+     * Changes one block based on the slide as it is in the store now. For changes that finish
+     * after an async step, such as an image search, so edits made in the meantime are kept.
+     */
+    updateBlock(slideId: string, blockId: string, update: (block: Block) => Block): boolean {
+      const block = currentSlide(slideId)
+        ?.columns.flatMap((column) => column.blocks)
+        .find((candidate) => candidate.id === blockId);
+      if (!block) {
+        onError("That content block no longer exists.");
+        return false;
+      }
+      return applyToSlide(slideId, (slide) => ({
+        type: "slide.update",
+        slideId,
+        baseRevision: slide.revision,
+        patch: { columns: replaceBlock(slide, update(block)) },
       }));
     },
     deleteSlide(slideId: string): boolean {

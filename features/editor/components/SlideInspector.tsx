@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/design-system/components/button";
 import { ConfirmDialog } from "@/design-system/components/confirm-dialog";
 import { Field, fieldClassName } from "@/design-system/components/field";
-import { BlockType, type Slide, type SlideLayout, type SlidePatch } from "@/features/deck/types";
+import type { Slide, SlideLayout, SlidePatch } from "@/features/deck/types";
 import { LIMITS, SLIDE_LAYOUTS } from "@/features/deck/utils/schema";
 import type { SlideActions } from "../hooks/use-slide-actions";
 import { LAYOUT_LABELS } from "@/features/deck/utils/labels";
@@ -12,14 +12,12 @@ import {
   editFieldId,
   layoutChangeRemovesContent,
   NEW_BLOCK_LABELS,
+  NEW_BLOCK_TYPES,
   removeBlock,
   replaceBlock,
   setColumnHeading,
-  type NewBlockType,
 } from "../utils/slide-editing";
 import { BlockEditor } from "./BlockEditor";
-
-const NEW_BLOCK_TYPES: NewBlockType[] = [BlockType.Bullets, BlockType.Paragraph, BlockType.Table];
 
 type SlideInspectorProps = {
   slide: Slide;
@@ -137,6 +135,7 @@ export function SlideInspector({ slide, position, actions }: SlideInspectorProps
               key={block.id}
               block={block}
               onChange={(updated) => update({ columns: replaceBlock(slide, updated) })}
+              onChangeLatest={(change) => actions.updateBlock(slide.id, block.id, change)}
               onRemove={() => update({ columns: removeBlock(slide, block.id) })}
             />
           ))}

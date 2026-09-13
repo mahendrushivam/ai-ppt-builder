@@ -1,11 +1,13 @@
 import type { Slide } from "@/features/deck/types";
 import type { Theme } from "@/features/themes/types";
 import { themeStyle } from "@/features/themes/utils/theme-style";
-import { SlideBlock } from "./SlideBlock";
+import { type ImageLoading, SlideBlock } from "./SlideBlock";
 
 type SlideRendererProps = {
   slide: Slide;
   theme: Theme;
+  /** `eager` for print and export, where every image must load even when it is off screen. */
+  imageLoading?: ImageLoading;
 };
 
 const COLUMN_GRID: Record<Slide["hints"]["columnRatio"], string> = {
@@ -21,7 +23,7 @@ const COLUMN_GRID: Record<Slide["hints"]["columnRatio"], string> = {
  * react to clicks; the renderer itself has no editing behavior. Sizes come from theme
  * tokens in container query units, so a slide scales with the width it is given.
  */
-export function SlideRenderer({ slide, theme }: SlideRendererProps) {
+export function SlideRenderer({ slide, theme, imageLoading = "lazy" }: SlideRendererProps) {
   const isTitleLayout = slide.layout === "title" || slide.layout === "section";
 
   return (
@@ -29,7 +31,7 @@ export function SlideRenderer({ slide, theme }: SlideRendererProps) {
       style={themeStyle(theme)}
       className="@container aspect-video w-full overflow-hidden [background:var(--slide-background)] text-(--slide-text) [font-family:var(--slide-body-font)]"
     >
-      {isTitleLayout ? <TitleLayout slide={slide} /> : <ContentLayout slide={slide} />}
+      {isTitleLayout ? <TitleLayout slide={slide} /> : <ContentLayout slide={slide} chartColors={theme.chartColors} imageLoading={imageLoading} />}
     </div>
   );
 }
@@ -57,7 +59,9 @@ function TitleLayout({ slide }: { slide: Slide }) {
   );
 }
 
-function ContentLayout({ slide }: { slide: Slide }) {
+type ContentLayoutProps = { slide: Slide; chartColors: readonly string[]; imageLoading: ImageLoading };
+
+function ContentLayout({ slide, chartColors, imageLoading }: ContentLayoutProps) {
   const centered = slide.hints.align === "center";
   const columnGrid = slide.columns.length === 2 ? COLUMN_GRID[slide.hints.columnRatio] : "grid-cols-1";
 
@@ -77,7 +81,7 @@ function ContentLayout({ slide }: { slide: Slide }) {
 
       <div className={`grid min-h-0 flex-1 gap-[calc(var(--slide-gap)*2)] ${columnGrid}`}>
         {slide.columns.map((column) => (
-          <section key={column.id} className="flex min-h-0 flex-col gap-(--slide-gap)">
+          <section key={column.id} data-column-id={column.id} className="flex min-h-0 flex-col gap-(--slide-gap)">
             {column.heading && (
               <h3
                 data-edit-target={`heading-${column.id}`}
@@ -87,7 +91,7 @@ function ContentLayout({ slide }: { slide: Slide }) {
               </h3>
             )}
             {column.blocks.map((block) => (
-              <SlideBlock key={block.id} block={block} />
+              <SlideBlock key={block.id} block={block} chartColors={chartColors} imageLoading={imageLoading} />
             ))}
           </section>
         ))}

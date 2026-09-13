@@ -10,7 +10,8 @@ import {
   SlideVisual,
 } from "@/features/ai/types";
 import { materializeSlide, slideInputSchema } from "@/features/ai/utils/slide-input";
-import { BlockType } from "@/features/deck/types";
+import { BlockType, type Slide } from "@/features/deck/types";
+import { type FindImage, findImage as findOpenverseImage, resolveColumnImages } from "@/services/images/openverse";
 import { LAYOUT_COLUMN_COUNT, LIMITS } from "@/features/deck/utils/schema";
 import type { SarvamMessage } from "../api/sarvam-client";
 import { SLIDE_TOOL } from "../tools/generation-tools";
@@ -21,6 +22,8 @@ type GenerateSlidesOptions = GenerateRequest & {
   signal: AbortSignal;
   emit: (event: AiStreamEvent) => void;
   retryDelayMs?: number;
+  /** Image search for image blocks in generated slides. */
+  findImage?: FindImage;
 };
 
 /**
@@ -39,6 +42,7 @@ export async function generateSlides({
   signal,
   emit,
   retryDelayMs,
+  findImage = findOpenverseImage,
 }: GenerateSlidesOptions): Promise<void> {
   let anchor = afterSlideId;
 
@@ -65,7 +69,15 @@ export async function generateSlides({
       continue;
     }
 
-    const slide = materializeSlide(result.input);
+    let slide: Slide;
+    try {
+      const materialized = materializeSlide(result.input);
+      slide = { ...materialized, columns: await resolveColumnImages(materialized.columns, findImage, signal) };
+    } catch (error) {
+      // Image searches only throw when the request was aborted.
+      if (signal.aborted) return;
+      throw error;
+    }
     emit({ type: AiStreamEventType.Operation, operation: { type: "slide.add", slide, afterSlideId: anchor } });
     emit({
       type: AiStreamEventType.SlideProgress,
@@ -133,7 +145,7 @@ function buildSlideMessages(prompt: string, outline: Outline, outlineIndex: numb
     "- Write only the requested slide, with the layout and title from the outline. Don't repeat content that belongs on other slides.",
     '- "title" and "section" slides have no columns, "content" has 1 column, "two-column" and "comparison" have 2 (comparison columns get short headings).',
     `- Plain text without markdown. At most ${LIMITS.bulletsPerBlock} bullets per block and ${LIMITS.blocksPerColumn} blocks per column. Keep bullets under 15 words.`,
-    '- Visuals: for "table" add a table block. For "chart" add a chart block, using clearly illustrative numbers unless the request gave data, and say so in the speaker notes. For "image" add an image block with a short stock-photo search query and alt text.',
+    '- Visuals: for "table" add a table block. For "chart" add a chart block of the type that fits the data (the chartType description says how each type reads the series), using clearly illustrative numbers unless the request gave data, and say so in the speaker notes. For "image" add an image block with a short stock-photo search query and alt text.',
     "- Add 1 to 3 sentences of speaker notes.",
   ].join("\n");
 

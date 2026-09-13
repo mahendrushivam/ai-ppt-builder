@@ -1,15 +1,33 @@
-import { type Block, BlockType, type BulletItem, type Column, type Slide, type SlideLayout } from "@/features/deck/types";
+import {
+  type Block,
+  type BlockOfType,
+  BlockType,
+  type BulletItem,
+  type Column,
+  type Slide,
+  type SlideLayout,
+} from "@/features/deck/types";
 import { createBlankSlide, createId } from "@/features/deck/utils/create";
-import { LAYOUT_COLUMN_COUNT } from "@/features/deck/utils/schema";
+import { LAYOUT_COLUMN_COUNT, LIMITS } from "@/features/deck/utils/schema";
 
-/** Blocks the editor can add by hand. Charts and images are only created by the AI for now. */
-export type NewBlockType = BlockType.Bullets | BlockType.Paragraph | BlockType.Table;
+/** Blocks the editor can add by hand. */
+export type NewBlockType = BlockType.Bullets | BlockType.Paragraph | BlockType.Table | BlockType.Chart | BlockType.Image;
 
 export const NEW_BLOCK_LABELS: Record<NewBlockType, string> = {
   [BlockType.Bullets]: "Bullet list",
   [BlockType.Paragraph]: "Paragraph",
   [BlockType.Table]: "Table",
+  [BlockType.Chart]: "Chart",
+  [BlockType.Image]: "Image",
 };
+
+export const NEW_BLOCK_TYPES: readonly NewBlockType[] = [
+  BlockType.Bullets,
+  BlockType.Paragraph,
+  BlockType.Table,
+  BlockType.Chart,
+  BlockType.Image,
+];
 
 export function createBlock(type: NewBlockType): Block {
   const id = createId("block");
@@ -20,6 +38,19 @@ export function createBlock(type: NewBlockType): Block {
       return { id, type, text: "" };
     case BlockType.Table:
       return { id, type, header: ["Column 1", "Column 2"], rows: [["", ""]] };
+    case BlockType.Chart:
+      // Sample data shows the chart right away; the chart editor changes its type and values.
+      return {
+        id,
+        type,
+        chartType: "bar",
+        title: null,
+        categories: ["Category 1", "Category 2", "Category 3"],
+        series: [{ name: "Series 1", values: [10, 20, 30] }],
+      };
+    case BlockType.Image:
+      // A search query is required, so the block starts with a sample the user replaces before finding an image.
+      return { id, type, query: "team working together", alt: "Team working together", image: null };
   }
 }
 
@@ -58,6 +89,31 @@ export function textToBullets(text: string, previous: BulletItem[]): BulletItem[
   });
 }
 
+/**
+ * The bullets to save for text typed in the editor: the first LIMITS.bulletsPerBlock lines, each
+ * cut to LIMITS.bulletText characters. `overflow` explains typed text that the slide doesn't keep.
+ */
+export function bulletsFromText(
+  text: string,
+  previous: BulletItem[],
+): { items: BulletItem[]; overflow: string | null } {
+  const typed = textToBullets(text, previous);
+  const kept = typed.slice(0, LIMITS.bulletsPerBlock);
+  const extraLines = typed.slice(LIMITS.bulletsPerBlock).filter((item) => item.text.trim() !== "").length;
+  const isCut = kept.some((item) => item.text.length > LIMITS.bulletText);
+  const items = isCut ? kept.map((item) => ({ ...item, text: item.text.slice(0, LIMITS.bulletText) })) : kept;
+
+  if (extraLines > 0) {
+    const lost = extraLines === 1 ? "line isn't" : `${extraLines} lines aren't`;
+    return {
+      items,
+      overflow: `A list shows up to ${LIMITS.bulletsPerBlock} points, so the last ${lost} saved. Add another list for more.`,
+    };
+  }
+  if (isCut) return { items, overflow: `Points can be up to ${LIMITS.bulletText} characters, so longer text isn't saved.` };
+  return { items, overflow: null };
+}
+
 // ---------------------------------------------------------------------------
 // Column changes (each returns the new columns for a `slide.update` patch)
 // ---------------------------------------------------------------------------
@@ -82,6 +138,72 @@ export function appendBlock(slide: Slide, columnId: string, block: Block): Colum
   return slide.columns.map((column) =>
     column.id === columnId ? { ...column, blocks: [...column.blocks, block] } : column,
   );
+}
+
+export function insertBlockAfter(slide: Slide, afterBlockId: string, block: Block): Column[] {
+  return slide.columns.map((column) => {
+    const index = column.blocks.findIndex((candidate) => candidate.id === afterBlockId);
+    return index === -1 ? column : { ...column, blocks: column.blocks.toSpliced(index + 1, 0, block) };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Replacing a block with another type
+// ---------------------------------------------------------------------------
+
+/**
+ * The block as another type, keeping its id so it stays selected. Bullets and paragraphs keep
+ * their text, cut to the new type's limits; any other change starts the new type empty.
+ */
+export function convertBlock(block: Block, type: NewBlockType): Block {
+  if (block.type === type) return block;
+  if (block.type === BlockType.Bullets && type === BlockType.Paragraph) {
+    return { id: block.id, type, text: bulletLines(block).join("\n").slice(0, LIMITS.paragraph) };
+  }
+  if (block.type === BlockType.Paragraph && type === BlockType.Bullets) {
+    return { id: block.id, type, items: bulletsFromText(paragraphLines(block.text).join("\n"), []).items };
+  }
+  return { ...createBlock(type), id: block.id };
+}
+
+/** True when replacing the block with `type` would throw away content the user wrote. */
+export function replacementLosesContent(block: Block, type: NewBlockType): boolean {
+  if (block.type === type || !hasContent(block)) return false;
+  if (block.type === BlockType.Bullets && type === BlockType.Paragraph) {
+    return bulletLines(block).join("\n").length > LIMITS.paragraph;
+  }
+  if (block.type === BlockType.Paragraph && type === BlockType.Bullets) {
+    const lines = paragraphLines(block.text);
+    return lines.length > LIMITS.bulletsPerBlock || lines.some((line) => line.length > LIMITS.bulletText);
+  }
+  return true;
+}
+
+function hasContent(block: Block): boolean {
+  switch (block.type) {
+    case BlockType.Bullets:
+      return bulletLines(block).length > 0;
+    case BlockType.Paragraph:
+      return block.text.trim() !== "";
+    case BlockType.Table:
+      // A new table's header is placeholder text, so only filled-in rows count.
+      return block.rows.flat().some((cell) => cell.trim() !== "");
+    case BlockType.Chart:
+      return true;
+    case BlockType.Image:
+      return block.image !== null;
+  }
+}
+
+function bulletLines(block: BlockOfType<BlockType.Bullets>): string[] {
+  return block.items.map((item) => item.text.trim()).filter((text) => text !== "");
+}
+
+function paragraphLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
 }
 
 export function setColumnHeading(slide: Slide, columnId: string, heading: string): Column[] {

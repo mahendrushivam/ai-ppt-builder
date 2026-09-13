@@ -32,6 +32,7 @@ export enum AiPhase {
   Thinking = "thinking",
   UpdatingSlides = "updating_slides",
   ApplyingChanges = "applying_changes",
+  AddingImages = "adding_images",
   WritingReply = "writing_reply",
 }
 

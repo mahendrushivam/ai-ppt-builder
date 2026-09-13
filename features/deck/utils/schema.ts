@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UPLOADED_IMAGE_SRC_PATTERN } from "./uploaded-image";
 import { themeIdSchema } from "@/features/themes/utils/themes";
 import { BlockType, type SlideLayout } from "../types";
 
@@ -38,8 +39,51 @@ export const LAYOUT_COLUMN_COUNT = {
   comparison: 2,
 } as const satisfies Record<SlideLayout, number>;
 
-const CHART_TYPES = ["bar", "line", "pie"] as const;
+export const CHART_TYPES = [
+  "bar",
+  "stacked-bar",
+  "line",
+  "stacked-line",
+  "area",
+  "stacked-area",
+  "pie",
+  "funnel",
+  "treemap",
+  "sunburst",
+  "sankey",
+  "scatter",
+] as const;
 type ChartType = (typeof CHART_TYPES)[number];
+
+type ChartDataRules = {
+  /** Name used in validation messages. */
+  name: string;
+  /** The exact number of series the chart reads, or `null` for any number. */
+  seriesCount: 1 | 2 | null;
+  /** Values must be 0 or more because they are sizes or flows. */
+  nonNegative: boolean;
+};
+
+/**
+ * How each chart type reads the shared data: categories, and series with one value per
+ * category. Validation, the chart editor and the AI's tool description follow these rules.
+ */
+export const CHART_RULES: Record<ChartType, ChartDataRules> = {
+  bar: { name: "bar", seriesCount: null, nonNegative: false },
+  "stacked-bar": { name: "stacked bar", seriesCount: null, nonNegative: false },
+  line: { name: "line", seriesCount: null, nonNegative: false },
+  "stacked-line": { name: "stacked line", seriesCount: null, nonNegative: false },
+  area: { name: "area", seriesCount: null, nonNegative: false },
+  "stacked-area": { name: "stacked area", seriesCount: null, nonNegative: false },
+  pie: { name: "pie", seriesCount: 1, nonNegative: true },
+  funnel: { name: "funnel", seriesCount: 1, nonNegative: true },
+  treemap: { name: "treemap", seriesCount: 1, nonNegative: true },
+  sunburst: { name: "sunburst", seriesCount: null, nonNegative: true },
+  sankey: { name: "Sankey", seriesCount: null, nonNegative: true },
+  scatter: { name: "scatter", seriesCount: 2, nonNegative: false },
+};
+
+const SERIES_COUNT_WORDS = { 1: "one", 2: "two" } as const;
 
 const idSchema = z.string().min(1).max(64);
 const revisionSchema = z.int().min(0);
@@ -77,11 +121,13 @@ export function chartShapeIssues(chart: {
           `Chart series "${series.name}" has ${series.values.length} values but there are ${chart.categories.length} categories.`,
         ],
   );
-  if (chart.chartType === "pie") {
-    if (chart.series.length !== 1) issues.push("A pie chart must have exactly one series.");
-    if (chart.series.some((series) => series.values.some((value) => value < 0))) {
-      issues.push("Pie chart values cannot be negative.");
-    }
+  const rules = CHART_RULES[chart.chartType];
+  if (rules.seriesCount !== null && chart.series.length !== rules.seriesCount) {
+    const article = /^[aeiou]/i.test(rules.name) ? "An" : "A";
+    issues.push(`${article} ${rules.name} chart must have exactly ${SERIES_COUNT_WORDS[rules.seriesCount]} series.`);
+  }
+  if (rules.nonNegative && chart.series.some((series) => series.values.some((value) => value < 0))) {
+    issues.push(`${rules.name[0].toUpperCase()}${rules.name.slice(1)} chart values cannot be negative.`);
   }
   return issues;
 }
@@ -105,7 +151,11 @@ export const tableFields = {
 };
 
 export const chartFields = {
-  chartType: z.enum(CHART_TYPES),
+  chartType: z
+    .enum(CHART_TYPES)
+    .describe(
+      "How the data is read. bar, line, area and their stacked- versions: categories along the x axis, one series per bar, line or area. pie, funnel and treemap: exactly one series; each category is a slice, stage or tile. scatter: exactly two series, X values then Y values; each category labels one point. sankey: each series is a source, each category a target, and values are the flows between them. sunburst: each series is an inner-ring group split into the categories. Values of pie, funnel, treemap, sankey and sunburst charts can't be negative.",
+    ),
   categories: z.array(z.string().max(LIMITS.chartLabel)).min(1).max(LIMITS.chartCategories),
   series: z
     .array(z.object({ name: z.string().max(LIMITS.chartLabel), values: z.array(z.number()) }))
@@ -114,11 +164,14 @@ export const chartFields = {
 };
 
 export const resolvedImageSchema = z.object({
-  src: z.url({ protocol: /^https$/ }),
+  /** An https URL, or a reference to an image the user uploaded to this browser. */
+  src: z.union([z.url({ protocol: /^https$/ }), z.string().regex(UPLOADED_IMAGE_SRC_PATTERN)]),
   width: z.int().positive(),
   height: z.int().positive(),
+  /** Credit shown under the image; empty for uploads. */
   attribution: z.string().max(LIMITS.imageAttribution),
-  sourceUrl: z.url({ protocol: /^https?$/ }),
+  /** The page the image was found on; `null` for uploads. */
+  sourceUrl: z.url({ protocol: /^https?$/ }).nullable(),
 });
 
 const bulletItemSchema = z.object({
@@ -152,8 +205,8 @@ export const blockSchema = z.discriminatedUnion("type", [
   z.object({
     id: idSchema,
     type: z.literal(BlockType.Image),
-    /** Search query the image was (or will be) resolved from. */
-    query: z.string().min(1).max(LIMITS.imageQuery),
+    /** Search query the image was (or will be) resolved from. Empty while the user is still typing one. */
+    query: z.string().max(LIMITS.imageQuery),
     alt: z.string().max(LIMITS.imageAlt),
     /** `null` until the server has found an image for the query. */
     image: resolvedImageSchema.nullable(),

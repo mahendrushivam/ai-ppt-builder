@@ -1,4 +1,5 @@
-import { chatRequestSchema, eventStreamResponse, parseRequestBody } from "@/features/ai/utils/stream-protocol";
+import { chatRequestSchema, eventStreamResponse } from "@/features/ai/utils/stream-protocol";
+import { parseRequestBody } from "@/lib/request";
 import { runChatTurn } from "@/services/ai/agents/chat-agent";
 
 /** A turn can take several model rounds; each is usually a few seconds. */

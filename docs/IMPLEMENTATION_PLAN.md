@@ -32,7 +32,7 @@ These were checked against the real services, not assumed from docs.
 | Sarvam streaming + tools | Streams `delta.reasoning_content` first, then OpenAI-style `delta.tool_calls` fragments (`index`, `id`+`name` on first chunk, `arguments` string fragments), then `finish_reason`, then `data: [DONE]` | Server can emit each slide as soon as its tool call completes |
 | Sarvam limits | 128K context; max output 4096 tokens (Starter); 40 req/min on `sarvam-105b`; `stream_options`/`max_completion_tokens` unsupported | One slide per generation call; retry with backoff on 429/503 |
 | Sarvam forced tool calls (checked 2026-09-14) | `tool_choice` naming a tool, and `"required"`, both returned the forced call with valid arguments in ~2–3s with reasoning off. With low reasoning the same outline request spent all 4096 output tokens reasoning (21s) and never called the tool | Generation calls force their tool with reasoning off |
-| Images | Openverse `GET /v1/images/?q=` works **without a key**; returns `url`, `thumbnail`, `license`, `creator`, `attribution` | Model supplies an image *query*, server resolves it to a real URL |
+| Images | Openverse `GET /v1/images/?q=` works **without a key**; returns `url`, `thumbnail`, `license`, `creator`, `attribution`. Checked again 2026-09-14: all image URLs https, ~1.6–2.1s per search, anonymous limits 20/min and 200/day, and `license_type=commercial` drops non-commercial licenses | Model supplies an image *query*, server resolves it to a real URL with a commercial-and-modification license filter and a per-query cache |
 | Hosting | Vercel Hobby: 300s max function duration (includes streamed response), 4.5MB body limit | Generation must finish < 300s; set `maxDuration` |
 | Next 16 | Route Handlers use Web `Request`/`Response`; POST handlers never cached; `maxDuration` route segment config exists | Streaming route handlers, no caching config needed |
 
@@ -388,7 +388,7 @@ Three kinds of state, kept separate (per rules):
 app/
   layout.tsx
   page.tsx                          thin: renders <Workspace />
-  print/page.tsx                    print-to-PDF view
+  decks/[deckId]/print/page.tsx     export view: print-to-PDF and slide PNGs
   api/ai/outline/route.ts
   api/ai/generate/route.ts          export const maxDuration = 300
   api/ai/chat/route.ts
@@ -429,8 +429,9 @@ features/
     components/                     ChatPanel, PromptForm, OutlineReview, GenerationProgress
 
   export/
-    components/PrintDeck.tsx
-    print.css
+    components/PrintDeck.tsx        all slides at export size, print + per-slide PNG
+    components/ExportMenu.tsx       editor menu: print view, selected slide as PNG
+    utils/slide-export.ts           wait for images/charts, html-to-image capture, download
 
 services/                           external systems, shared across features
   ai/
@@ -516,11 +517,27 @@ Stack: Vitest, React Testing Library, user-event, MSW, jsdom. `test()` not `it()
 |---|---|---|---|
 | M4 | Two-phase generation: outline + review UI + parallel slide stream + progress/stop/retry | prompt → outline → slides appear one by one | 3h |
 | M5 | Rich content: table, chart, image (Openverse) blocks — render, edit, AI tools | AI can add a comparison table and a bar chart | 2h |
-| M6 | Print-to-PDF view | clean one-slide-per-page PDF from browser print | 1h |
-| M7 | P2 in order: undo/redo → context management → themes | as time allows | 2–3h |
-| M8 | README (setup, architecture, decisions, known issues), final deploy, transcripts | deliverables complete | 1h |
+| M6 | Export: print-to-PDF view + slide PNG download | clean one-slide-per-page PDF from browser print; any slide saved as a 2× PNG | 1.5h |
+| M7 | Direct manipulation: drag blocks within and between columns, resize the column split and block heights, undo/redo | see *M7 — Direct manipulation* below | 3–4h |
+| M8 | P2 in order: context management → themes | as time allows | 1–2h |
+| M9 | README (setup, architecture, decisions, known issues), final deploy, transcripts | deliverables complete | 1h |
 
 **If behind schedule:** cut P2 items from the bottom of the list, never P0/P1. Document what was cut in the README.
+
+### M6 — Export (decisions)
+
+- **PDF:** `/decks/[deckId]/print` renders every slide at a fixed 1280×720 with `@page { size: 1280px 720px; margin: 0 }`, one slide per page. The browser's print dialog saves the PDF, so no PDF library is needed. Printing is enabled only after uploads are read, images load and charts measure themselves (10s cap).
+- **PNG:** `html-to-image` draws a slide at 2×. The editor's Export menu draws the selected slide off screen at export size; the print view has a download button per slide. Openverse image hosts send `Access-Control-Allow-Origin: *`, so photos are copied directly; an image whose host doesn't is drawn as a transparent area rather than failing the export. Uploaded images are `blob:` URLs and always work.
+
+### M7 — Direct manipulation (planned)
+
+Editing stays inside the layout system: slides keep their layouts, AI generation keeps working unchanged, and there is no free-form positioning.
+
+- **Drag and drop:** reorder blocks inside a column and move them between columns, on the canvas and in the slide settings list. Library: `@dnd-kit` (keyboard and touch dragging with screen reader announcements); the slide list moves to it too, replacing native HTML5 drag events that don't support keyboard or touch. Move up/down buttons remain as the non-drag alternative.
+- **Resizing:** drag the gap between two columns to set the split (stored as `hints.columnSplit`, 25–75%, snapping to thirds and halves; it replaces the three `columnRatio` presets with a migration), and drag a block's bottom edge to set its share of the column height (`size` on each block: 1–4, default 1). Keyboard: arrow keys on the focused handle.
+- **Operations:** `block.move` (from column and index → to column and index) and `slide.resize` (column split and block sizes) join `DeckOperation`, with the same revision checks as other operations. The AI context and tool schema include the new fields so AI edits keep manual sizing.
+- **Undo/redo:** a per-deck history in the editor (not persisted): each entry stores the operation and the slide or deck state before it. A drag or resize gesture is one entry; an AI chat turn or generation run is one entry. Up to 50 entries; Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z plus ↶ ↷ header buttons. Undoing a slide that changed since (for example, an AI edit arrived) is skipped with a message instead of overwriting it.
+- **Tests:** operation tests for moves, resizes and schema migration; history tests (grouping, limits, conflicts); editor tests for keyboard dragging, resizing handles and undo/redo shortcuts.
 
 ---
 

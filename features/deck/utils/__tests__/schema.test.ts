@@ -99,6 +99,28 @@ describe("deck schema", () => {
     );
   });
 
+  test("applies each chart type's rules for the number of series and negative values", () => {
+    const twoSeries = [
+      { name: "A", values: [1, 2] },
+      { name: "B", values: [3, 4] },
+    ];
+
+    expect(
+      blockSchema.safeParse({ ...chart, chartType: "stacked-bar", series: [...twoSeries, { name: "C", values: [-1, 2] }] })
+        .success,
+    ).toBe(true);
+    expect(blockSchema.safeParse({ ...chart, chartType: "sunburst", series: twoSeries }).success).toBe(true);
+    expect(errorMessages(blockSchema.safeParse({ ...chart, chartType: "funnel", series: twoSeries }))).toContain(
+      "A funnel chart must have exactly one series.",
+    );
+    expect(errorMessages(blockSchema.safeParse({ ...chart, chartType: "scatter", series: [twoSeries[0]] }))).toContain(
+      "A scatter chart must have exactly two series.",
+    );
+    expect(
+      errorMessages(blockSchema.safeParse({ ...chart, chartType: "sankey", series: [{ name: "A", values: [1, -2] }] })),
+    ).toContain("Sankey chart values cannot be negative.");
+  });
+
   test("rejects non-finite chart values", () => {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY]) {
       const result = blockSchema.safeParse({ ...chart, series: [{ name: "2026", values: [1, value] }] });
@@ -122,6 +144,25 @@ describe("deck schema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  test("accepts an image block whose search hasn't been typed yet", () => {
+    expect(blockSchema.safeParse({ id: "b1", type: "image", query: "", alt: "", image: null }).success).toBe(true);
+  });
+
+  test("accepts references to uploaded images but no other kind of image source", () => {
+    const uploadedImageBlock = (src: string) => ({
+      id: "b1",
+      type: "image",
+      query: "team",
+      alt: "Team",
+      image: { src, width: 10, height: 10, attribution: "", sourceUrl: null },
+    });
+
+    expect(blockSchema.safeParse(uploadedImageBlock("upload:upload_0123456789ab")).success).toBe(true);
+    for (const src of ["upload:../secret", "blob:https://example.com/1", "data:image/png;base64,AAAA"]) {
+      expect(blockSchema.safeParse(uploadedImageBlock(src)).success, src).toBe(false);
+    }
   });
 
   test("rejects blank deck titles and duplicate slide ids", () => {

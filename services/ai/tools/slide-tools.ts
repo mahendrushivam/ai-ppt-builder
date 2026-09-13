@@ -11,6 +11,7 @@ import {
   slideInputSchema,
   slidePatchInputSchema,
 } from "@/features/ai/utils/slide-input";
+import { type FindImage, resolveColumnImages } from "@/services/images/openverse";
 import type { SarvamTool } from "../api/sarvam-client";
 
 /** Names of the tools the chat model can call. They appear in model requests and responses. */
@@ -77,11 +78,23 @@ type ToolCallFailure = {
 
 type ToolCallResult = { ok: true; deck: Deck; operation: DeckOperation; summary: string } | ToolCallFailure;
 
+type ExecuteToolCallOptions = {
+  /** Looks up images for image blocks the call adds. */
+  findImage: FindImage;
+  signal: AbortSignal;
+};
+
 /**
- * Validates one tool call against the working deck and applies it. Failures come back as
- * messages written for the model, so it can correct the call in the next round.
+ * Validates one tool call against the working deck, looks up images for image blocks it adds,
+ * and applies it. Failures come back as messages written for the model, so it can correct the
+ * call in the next round. Only an aborted `signal` throws.
  */
-export function executeToolCall(deck: Deck, name: string, rawArguments: string): ToolCallResult {
+export async function executeToolCall(
+  deck: Deck,
+  name: string,
+  rawArguments: string,
+  { findImage, signal }: ExecuteToolCallOptions,
+): Promise<ToolCallResult> {
   let args: unknown;
   try {
     args = rawArguments.trim() === "" ? {} : JSON.parse(rawArguments);
@@ -92,14 +105,42 @@ export function executeToolCall(deck: Deck, name: string, rawArguments: string):
   const planned = planOperation(deck, name, args);
   if (!planned.ok) return planned;
 
-  const result = applyOperation(deck, planned.operation);
+  // Images are looked up before the change is applied anywhere, so the working deck and the
+  // browser receive the same content.
+  const operation = await withResolvedImages(planned.operation, findImage, signal);
+  const result = applyOperation(deck, operation);
   if (!result.ok) return { ok: false, message: result.message, needsCorrection: true };
-  return {
-    ok: true,
-    deck: result.deck,
-    operation: planned.operation,
-    summary: summarize(deck, result.deck, planned.operation),
-  };
+  return { ok: true, deck: result.deck, operation, summary: summarize(deck, result.deck, operation) };
+}
+
+async function withResolvedImages(
+  operation: DeckOperation,
+  findImage: FindImage,
+  signal: AbortSignal,
+): Promise<DeckOperation> {
+  switch (operation.type) {
+    case "slide.add":
+      return {
+        ...operation,
+        slide: { ...operation.slide, columns: await resolveColumnImages(operation.slide.columns, findImage, signal) },
+      };
+    case "slide.update":
+      return operation.patch.columns
+        ? {
+            ...operation,
+            patch: { ...operation.patch, columns: await resolveColumnImages(operation.patch.columns, findImage, signal) },
+          }
+        : operation;
+    case "slide.changeLayout":
+      return operation.columns
+        ? { ...operation, columns: await resolveColumnImages(operation.columns, findImage, signal) }
+        : operation;
+    case "slide.delete":
+    case "slide.move":
+    case "deck.rename":
+    case "deck.setTheme":
+      return operation;
+  }
 }
 
 type PlannedOperation = { ok: true; operation: DeckOperation } | ToolCallFailure;
