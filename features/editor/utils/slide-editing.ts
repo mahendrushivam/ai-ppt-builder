@@ -152,18 +152,18 @@ export function insertBlockAfter(slide: Slide, afterBlockId: string, block: Bloc
 // ---------------------------------------------------------------------------
 
 /**
- * The block as another type, keeping its id so it stays selected. Bullets and paragraphs keep
+ * The block as another type, keeping its id so it stays selected and its height. Bullets and paragraphs keep
  * their text, cut to the new type's limits; any other change starts the new type empty.
  */
 export function convertBlock(block: Block, type: NewBlockType): Block {
   if (block.type === type) return block;
   if (block.type === BlockType.Bullets && type === BlockType.Paragraph) {
-    return { id: block.id, type, text: bulletLines(block).join("\n").slice(0, LIMITS.paragraph) };
+    return { id: block.id, size: block.size, type, text: bulletLines(block).join("\n").slice(0, LIMITS.paragraph) };
   }
   if (block.type === BlockType.Paragraph && type === BlockType.Bullets) {
-    return { id: block.id, type, items: bulletsFromText(paragraphLines(block.text).join("\n"), []).items };
+    return { id: block.id, size: block.size, type, items: bulletsFromText(paragraphLines(block.text).join("\n"), []).items };
   }
-  return { ...createBlock(type), id: block.id };
+  return { ...createBlock(type), id: block.id, size: block.size };
 }
 
 /** True when replacing the block with `type` would throw away content the user wrote. */

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/design-system/components/button";
 import { Field, fieldClassName } from "@/design-system/components/field";
 import { type Block, type BlockOfType, BlockType } from "@/features/deck/types";
@@ -23,15 +23,20 @@ type BlockEditorProps = {
   /** Changes the block as it is now, for changes that finish after an async step. */
   onChangeLatest: (update: (block: Block) => Block) => void;
   onRemove: () => void;
+  /** Shown before the block's name, for reordering the block. */
+  dragHandle?: ReactNode;
 };
 
-export function BlockEditor({ block, onChange, onChangeLatest, onRemove }: BlockEditorProps) {
+export function BlockEditor({ block, onChange, onChangeLatest, onRemove, dragHandle }: BlockEditorProps) {
   const name = BLOCK_NAMES[block.type];
 
   return (
     <div className="space-y-2 rounded-md bg-muted p-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground">{name}</span>
+        <div className="flex items-center gap-1">
+          {dragHandle}
+          <span className="text-xs font-semibold text-muted-foreground">{name}</span>
+        </div>
         <div className="flex items-center gap-0.5">
           <ReplaceBlockMenu block={block} onReplace={onChange} />
           <Button size="sm" variant="ghost" onClick={onRemove} aria-label={`Remove ${name.toLowerCase()}`}>

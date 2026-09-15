@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { contentSlide, deckWith } from "@/testing/fixtures";
+import { contentSlide, deckWith, paragraph, twoColumnSlide } from "@/testing/fixtures";
 import { failStorageWrites } from "@/testing/mocks/local-storage";
 import { DECKS_BACKUP_STORAGE_KEY, DECKS_STORAGE_KEY, loadDecks, saveDecks } from "../decks";
 
@@ -9,6 +9,25 @@ describe("deck storage", () => {
 
     expect(saveDecks([deck])).toEqual({ ok: true });
     expect(loadDecks()).toEqual({ decks: [deck], warning: null });
+  });
+
+  test("turns the column ratios saved by version 1 into column splits", () => {
+    const deck = deckWith(twoColumnSlide("a", [paragraph("left")], []), contentSlide("b"));
+    const version1Deck = {
+      ...deck,
+      slides: deck.slides.map(({ hints, ...slide }, index) => ({
+        ...slide,
+        hints: { align: hints.align, columnRatio: index === 0 ? "2:1" : "1:1" },
+      })),
+    };
+    localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify({ version: 1, decks: [version1Deck] }));
+
+    const result = loadDecks();
+
+    expect(result.warning).toBeNull();
+    expect(result.decks[0].slides.map((slide) => slide.hints.columnSplit)).toEqual([66.67, 50]);
+    saveDecks(result.decks);
+    expect(JSON.parse(localStorage.getItem(DECKS_STORAGE_KEY) ?? "{}")).toMatchObject({ version: 2 });
   });
 
   test("starts empty without a warning when nothing was saved", () => {

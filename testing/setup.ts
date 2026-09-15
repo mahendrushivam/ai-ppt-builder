@@ -7,6 +7,7 @@ import { installBlobArrayBufferPolyfill } from "./mocks/blob";
 import { installDialogPolyfill } from "./mocks/dialog";
 import { installMatchMediaPolyfill } from "./mocks/match-media";
 import { installObjectUrlPolyfill } from "./mocks/object-url";
+import { installRangePolyfill } from "./mocks/range";
 import { installResizeObserverPolyfill } from "./mocks/resize-observer";
 import { server } from "./msw/server";
 import { resetDecksStore } from "./stores";
@@ -15,6 +16,7 @@ installBlobArrayBufferPolyfill();
 installDialogPolyfill();
 installMatchMediaPolyfill();
 installObjectUrlPolyfill();
+installRangePolyfill();
 installResizeObserverPolyfill();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));

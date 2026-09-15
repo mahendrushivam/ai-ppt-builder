@@ -529,15 +529,27 @@ Stack: Vitest, React Testing Library, user-event, MSW, jsdom. `test()` not `it()
 - **PDF:** `/decks/[deckId]/print` renders every slide at a fixed 1280×720 with `@page { size: 1280px 720px; margin: 0 }`, one slide per page. The browser's print dialog saves the PDF, so no PDF library is needed. Printing is enabled only after uploads are read, images load and charts measure themselves (10s cap).
 - **PNG:** `html-to-image` draws a slide at 2×. The editor's Export menu draws the selected slide off screen at export size; the print view has a download button per slide. Openverse image hosts send `Access-Control-Allow-Origin: *`, so photos are copied directly; an image whose host doesn't is drawn as a transparent area rather than failing the export. Uploaded images are `blob:` URLs and always work.
 
-### M7 — Direct manipulation (planned)
+### M7 — Direct manipulation (decisions)
 
 Editing stays inside the layout system: slides keep their layouts, AI generation keeps working unchanged, and there is no free-form positioning.
 
-- **Drag and drop:** reorder blocks inside a column and move them between columns, on the canvas and in the slide settings list. Library: `@dnd-kit` (keyboard and touch dragging with screen reader announcements); the slide list moves to it too, replacing native HTML5 drag events that don't support keyboard or touch. Move up/down buttons remain as the non-drag alternative.
-- **Resizing:** drag the gap between two columns to set the split (stored as `hints.columnSplit`, 25–75%, snapping to thirds and halves; it replaces the three `columnRatio` presets with a migration), and drag a block's bottom edge to set its share of the column height (`size` on each block: 1–4, default 1). Keyboard: arrow keys on the focused handle.
-- **Operations:** `block.move` (from column and index → to column and index) and `slide.resize` (column split and block sizes) join `DeckOperation`, with the same revision checks as other operations. The AI context and tool schema include the new fields so AI edits keep manual sizing.
-- **Undo/redo:** a per-deck history in the editor (not persisted): each entry stores the operation and the slide or deck state before it. A drag or resize gesture is one entry; an AI chat turn or generation run is one entry. Up to 50 entries; Cmd/Ctrl+Z and Shift+Cmd/Ctrl+Z plus ↶ ↷ header buttons. Undoing a slide that changed since (for example, an AI edit arrived) is skipped with a message instead of overwriting it.
-- **Tests:** operation tests for moves, resizes and schema migration; history tests (grouping, limits, conflicts); editor tests for keyboard dragging, resizing handles and undo/redo shortcuts.
+- **Libraries:** `@dnd-kit/core` + `@dnd-kit/sortable` (classic API) for drag and drop, `react-resizable-panels` for resizing. `@dnd-kit/react` was considered: it is actively released but still 0.x; the classic packages are stable and work with React 19.
+- **Drag and drop:**
+  - *Slide list:* sortable thumbnails. Pointer drags start anywhere on a thumbnail (after 4px, so clicks still select); keyboard drags start from a grip handle. The move up/down buttons remain.
+  - *Slide settings:* block cards are sortable within a column and across both columns. The block under the pointer wins over the column around it; dropping below a column's blocks appends.
+  - *Canvas:* the floating toolbar has a "Move" handle. Starting a drag measures the drawn blocks and lays invisible drop regions over the gaps between them (one region per gap, meeting at block middles). Arrow keys step through the gaps in order during a keyboard drag. The renderer is not changed.
+  - Screen reader announcements use slide and block names instead of ids.
+- **Resizing:** an editor-only overlay of `react-resizable-panels` groups laid over the canvas, because the library needs its own flex container and the renderer (shared with thumbnails, print and PNG export) uses CSS grid. Only the separators take pointer events; they are focusable and resize with arrow keys.
+  - *Column split:* `hints.columnSplit`, the first column's width in percent (25–75). It replaces the three `columnRatio` presets; drags snap to ⅓, ½ and ⅔ within 2 points. The Column widths select keeps the presets as a non-drag alternative.
+  - *Block heights:* optional `size` on each block, its share of the column height in percent (min 10). The renderer only uses heights when every block in a column has one; otherwise blocks take their content height, as before. "Reset block heights" in slide settings removes them.
+  - While dragging, the canvas previews the sizes; the preview belongs to the slide revision it was made on, so any saved change replaces it.
+- **Storage:** decks are saved as version 2. Version 1 decks are migrated on load (`1:1` → 50, `2:1` → 66.67, `1:2` → 33.33).
+- **Operations:** `block.move` (block id → target column id and index counted without the block) and `slide.resize` (column split and/or heights for every block of a column; `null` clears a height), with the same revision checks as other operations. The AI context shows `columnSplit` and block heights, and the model's block input accepts `size`, so AI rewrites can keep manual sizing.
+- **Undo/redo:** a per-deck history in the editor (not persisted), up to 50 steps, with ↶ ↷ header buttons and Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z (not while a text field has focus). Every deck change is recorded from the store as before/after snapshots:
+  - quick edits to the same fields (typing) merge into one step while they keep coming (1s);
+  - every change of one AI chat turn, or one generation run including its deck rename, is one step;
+  - undo and redo only put back slides that still look as the step left them; slides changed since (for example by an AI edit) are kept, with a message. Restored slides get a new revision, so stale AI edits are still rejected.
+- **Tests:** operation tests for moves, resizes and the migration; history tests (grouping, limits, conflicts, add/delete); drop, drop-slot and resize value tests; an editor test for undo/redo buttons and shortcuts. Pointer and keyboard drags and resizes are checked in headless Chrome, since jsdom has no layout.
 
 ---
 
@@ -547,7 +559,8 @@ Editing stays inside the layout system: slides keep their layouts, AI generation
 |---|---|---|
 | `zod` (v4) | schemas, validation, tool JSON Schema generation | hand-written validators — duplicated logic |
 | `zustand` | selector-based store to avoid re-rendering every slide on keystroke | Context + useReducer — re-renders all consumers |
-| `@dnd-kit/core`, `@dnd-kit/sortable` | accessible drag-and-drop reorder (keyboard support built in) | native HTML5 DnD — poor keyboard/a11y |
+| `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` | accessible drag-and-drop reorder (keyboard support built in) | native HTML5 DnD — poor keyboard/a11y; `@dnd-kit/react` — still 0.x; Pragmatic drag and drop — no keyboard dragging |
+| `react-resizable-panels` | accessible resize handles (keyboard, ARIA separator) for the column split and block heights | hand-written handles; `react-rnd` — free-form pixel boxes, no keyboard support |
 | `recharts` | bar/line/pie charts as SVG | hand-rolled SVG — axes/labels/legend take real time |
 | `server-only` | build-time guard against importing server modules in client code | convention only |
 | dev: `vitest`, `@vitejs/plugin-react`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, `msw` | testing stack from `.claude/rules/testing.md` | — |

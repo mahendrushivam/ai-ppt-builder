@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type DeckOperation, type OperationFailure, OperationFailureCode } from "@/features/deck/types";
-import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
+import { type ChangeGroup, ChangeGroupKind, useDecksStore } from "@/features/decks/hooks/use-decks-store";
 import { AiRequestError, streamChat } from "@/services/ai/api/api";
 import { loadChat, saveChat } from "@/services/localStorage/chat";
 import { type AiPhase, AiStreamEventType, type ChatEntry, type ChatHistoryMessage } from "../types";
@@ -79,6 +79,8 @@ export function useChat(deckId: string, selectedSlideId: string | null) {
     setStatus({ state: ChatState.Running, phase: null });
 
     const skipped: string[] = [];
+    // Everything one turn changes is undone together.
+    const group: ChangeGroup = { kind: ChangeGroupKind.Run, id: crypto.randomUUID() };
     let finished = false;
     let streamedReply = "";
     try {
@@ -89,7 +91,7 @@ export function useChat(deckId: string, selectedSlideId: string | null) {
             setStatus({ state: ChatState.Running, phase: event.phase });
             break;
           case AiStreamEventType.Operation: {
-            const skippedChange = applyAiOperation(deckId, event.operation);
+            const skippedChange = applyAiOperation(deckId, event.operation, group);
             if (skippedChange) skipped.push(skippedChange);
             break;
           }
@@ -152,9 +154,9 @@ function toHistory(entries: ChatEntry[]): ChatHistoryMessage[] {
 }
 
 /** Applies one AI change. Returns an explanation when it had to be skipped. */
-function applyAiOperation(deckId: string, operation: DeckOperation): string | null {
+function applyAiOperation(deckId: string, operation: DeckOperation, group: ChangeGroup): string | null {
   const store = useDecksStore.getState();
-  const result = store.applyOperation(deckId, operation);
+  const result = store.applyOperation(deckId, operation, group);
   return result.ok ? null : describeSkippedChange(deckId, operation, result);
 }
 

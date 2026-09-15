@@ -38,11 +38,31 @@ export async function waitForSlideAssets(root: HTMLElement, timeoutMs: number = 
   await nextFrame();
 }
 
+/** Styles that chart SVGs get from CSS rules: theme colors, grid lines and label fonts. */
+const SVG_STYLE_PROPERTIES = [
+  "fill",
+  "fill-opacity",
+  "stroke",
+  "stroke-opacity",
+  "stroke-width",
+  "stroke-dasharray",
+  "opacity",
+  "color",
+  "font-family",
+  "font-size",
+  "font-weight",
+] as const;
+
 /** Draws a slide element as a PNG at twice its size. */
 export async function captureSlidePng(node: HTMLElement): Promise<Blob> {
-  const blob = await toBlob(node, { pixelRatio: PNG_PIXEL_RATIO, imagePlaceholder: BLOCKED_IMAGE_PLACEHOLDER });
-  if (!blob) throw new Error("The slide could not be drawn.");
-  return blob;
+  const restoreSvgStyles = inlineSvgStyles(node);
+  try {
+    const blob = await toBlob(node, { pixelRatio: PNG_PIXEL_RATIO, imagePlaceholder: BLOCKED_IMAGE_PLACEHOLDER });
+    if (!blob) throw new Error("The slide could not be drawn.");
+    return blob;
+  } finally {
+    restoreSvgStyles();
+  }
 }
 
 export function downloadFile(blob: Blob, fileName: string): void {
@@ -61,6 +81,34 @@ export function downloadFile(blob: Blob, fileName: string): void {
 export async function exportSlidePng(node: HTMLElement, fileName: string): Promise<void> {
   await waitForSlideAssets(node);
   downloadFile(await captureSlidePng(node), fileName);
+}
+
+/**
+ * `html-to-image` copies an `<svg>` with its attributes only, so the styles CSS rules give chart
+ * contents would be lost and Recharts' default grey would show instead. Writes the computed
+ * styles onto the SVG elements for the capture; the returned function puts the old styles back.
+ */
+function inlineSvgStyles(root: HTMLElement): () => void {
+  const elements = [...root.querySelectorAll<SVGElement>("svg *")];
+  const previousStyles = elements.map((element) => element.getAttribute("style"));
+  const computedStyles = elements.map((element) => {
+    const computed = getComputedStyle(element);
+    return SVG_STYLE_PROPERTIES.map((property) => [property, computed.getPropertyValue(property)] as const);
+  });
+
+  elements.forEach((element, index) => {
+    for (const [property, value] of computedStyles[index]) {
+      if (value) element.style.setProperty(property, value);
+    }
+  });
+
+  return () => {
+    elements.forEach((element, index) => {
+      const previous = previousStyles[index];
+      if (previous === null) element.removeAttribute("style");
+      else element.setAttribute("style", previous);
+    });
+  };
 }
 
 function nextFrame(): Promise<void> {

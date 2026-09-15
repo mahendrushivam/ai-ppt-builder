@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
+import { type ChangeGroup, ChangeGroupKind, useDecksStore } from "@/features/decks/hooks/use-decks-store";
 import { AiRequestError, requestOutline, streamGeneration } from "@/services/ai/api/api";
 import { AiStreamEventType, type Outline, type OutlineRequest, SlideGenerationStatus } from "../types";
 import { type EditableOutline, outlineForGeneration, toEditableOutline } from "../utils/outline-editing";
@@ -118,7 +118,9 @@ export function useGeneration(deckId: string) {
     const deck = store.decks.find((candidate) => candidate.id === deckId);
     if (!outline || !deck) return;
 
-    const renamed = store.applyOperation(deckId, { type: "deck.rename", title: outline.deckTitle });
+    // The rename and every slide of the run are undone together.
+    const group = newRunGroup();
+    const renamed = store.applyOperation(deckId, { type: "deck.rename", title: outline.deckTitle }, group);
     if (!renamed.ok) console.error("Could not rename the deck to the outline's title:", renamed.message);
 
     const startAfterSlideId = deck.slides.at(-1)?.id ?? null;
@@ -136,7 +138,7 @@ export function useGeneration(deckId: string) {
       error: null,
       startAfterSlideId,
     });
-    await runGeneration(state.request.prompt, outline, outline.slides.map((_, index) => index), startAfterSlideId);
+    await runGeneration(state.request.prompt, outline, outline.slides.map((_, index) => index), startAfterSlideId, group);
   }
 
   async function retrySlide(index: number) {
@@ -165,7 +167,13 @@ export function useGeneration(deckId: string) {
     return new Set(deck?.slides.map((slide) => slide.id));
   }
 
-  async function runGeneration(prompt: string, outline: Outline, outlineIndexes: number[], afterSlideId: string | null) {
+  async function runGeneration(
+    prompt: string,
+    outline: Outline,
+    outlineIndexes: number[],
+    afterSlideId: string | null,
+    group: ChangeGroup = newRunGroup(),
+  ) {
     const controller = startRequest();
     updateGenerating((current) => ({ ...current, run: GenerationRun.Running, error: null }));
 
@@ -190,7 +198,7 @@ export function useGeneration(deckId: string) {
             break;
           }
           case AiStreamEventType.Operation: {
-            const result = useDecksStore.getState().applyOperation(deckId, event.operation);
+            const result = useDecksStore.getState().applyOperation(deckId, event.operation, group);
             if (!result.ok && currentIndex !== null) {
               rejected.set(currentIndex, `The slide couldn't be added: ${result.message}`);
             }
@@ -259,4 +267,8 @@ function describeRequestError(error: unknown): string {
   if (error instanceof AiRequestError) return error.message;
   console.error("AI request failed:", error);
   return "Couldn't reach the server. Check your connection and try again.";
+}
+
+function newRunGroup(): ChangeGroup {
+  return { kind: ChangeGroupKind.Run, id: crypto.randomUUID() };
 }

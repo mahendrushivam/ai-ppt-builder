@@ -301,3 +301,106 @@ describe("deckOperationSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("block.move", () => {
+  const leftAndRight = () => twoColumnSlide("s", [paragraph("a"), paragraph("b")], [paragraph("c")]);
+  const blockIds = (deck: Deck, columnIndex: number) =>
+    deck.slides[0].columns[columnIndex].blocks.map((block) => block.id);
+  const move = (blockId: string, toColumnId: string, toIndex: number, baseRevision = 0) =>
+    ({ type: "block.move", slideId: "s", baseRevision, blockId, toColumnId, toIndex }) as const;
+
+  test("reorders a block within its column without touching the other column", () => {
+    const deck = deckWith(leftAndRight());
+
+    const next = expectOk(applyOperation(deck, move("block_a", "s_left", 1)));
+
+    expect(blockIds(next, 0)).toEqual(["block_b", "block_a"]);
+    expect(next.slides[0].revision).toBe(1);
+    expect(next.slides[0].columns[1]).toBe(deck.slides[0].columns[1]);
+  });
+
+  test("moves a block into another column at the given position", () => {
+    const deck = deckWith(leftAndRight());
+
+    const next = expectOk(applyOperation(deck, move("block_b", "s_right", 0)));
+
+    expect(blockIds(next, 0)).toEqual(["block_a"]);
+    expect(blockIds(next, 1)).toEqual(["block_b", "block_c"]);
+  });
+
+  test("changes nothing when the block is dropped where it already is", () => {
+    const deck = deckWith(leftAndRight());
+
+    expect(expectOk(applyOperation(deck, move("block_a", "s_left", 0)))).toBe(deck);
+  });
+
+  test("rejects a move into a full column", () => {
+    const full = twoColumnSlide("s", [paragraph("a")], ["c", "d", "e", "f"].map(paragraph));
+
+    const failure = expectFailure(applyOperation(deckWith(full), move("block_a", "s_right", 0)), OperationFailureCode.Invalid);
+
+    expect(failure.message).toContain("at most 4 blocks");
+  });
+
+  test("rejects a stale revision, a missing block or column and a position past the end", () => {
+    const deck = deckWith(leftAndRight());
+
+    expectFailure(applyOperation(deck, move("block_a", "s_right", 0, 3)), OperationFailureCode.Conflict);
+    expectFailure(applyOperation(deck, move("block_gone", "s_right", 0)), OperationFailureCode.NotFound);
+    expectFailure(applyOperation(deck, move("block_a", "s_gone", 0)), OperationFailureCode.NotFound);
+    expectFailure(applyOperation(deck, move("block_a", "s_right", 2)), OperationFailureCode.Invalid);
+  });
+});
+
+describe("slide.resize", () => {
+  const resize = (fields: { columnSplit?: number; blockSizes?: { blockId: string; size: number | null }[] }) =>
+    ({ type: "slide.resize", slideId: "s", baseRevision: 0, ...fields }) as const;
+
+  test("sets the column split and the heights of one column's blocks", () => {
+    const deck = deckWith(twoColumnSlide("s", [paragraph("a"), paragraph("b")], [paragraph("c")]));
+
+    const next = expectOk(
+      applyOperation(
+        deck,
+        resize({ columnSplit: 60, blockSizes: [{ blockId: "block_a", size: 70 }, { blockId: "block_b", size: 30 }] }),
+      ),
+    );
+
+    const [slide] = next.slides;
+    expect(slide.hints.columnSplit).toBe(60);
+    expect(slide.columns[0].blocks.map((block) => block.size)).toEqual([70, 30]);
+    expect(slide.columns[1]).toBe(deck.slides[0].columns[1]);
+    expect(slide.revision).toBe(1);
+  });
+
+  test("returns blocks to their content height", () => {
+    const sized = twoColumnSlide("s", [{ ...paragraph("a"), size: 40 }, { ...paragraph("b"), size: 60 }], []);
+
+    const next = expectOk(
+      applyOperation(
+        deckWith(sized),
+        resize({ blockSizes: [{ blockId: "block_a", size: null }, { blockId: "block_b", size: null }] }),
+      ),
+    );
+
+    expect(next.slides[0].columns[0].blocks.map((block) => block.size)).toEqual([undefined, undefined]);
+  });
+
+  test("rejects heights for only some blocks of a column", () => {
+    const deck = deckWith(twoColumnSlide("s", [paragraph("a"), paragraph("b")], []));
+
+    expectFailure(applyOperation(deck, resize({ blockSizes: [{ blockId: "block_a", size: 50 }] })), OperationFailureCode.Invalid);
+  });
+
+  test("rejects a column split on a one-column slide and an empty resize", () => {
+    const deck = deckWith(contentSlide("s", [paragraph("a")]));
+
+    expectFailure(applyOperation(deck, resize({ columnSplit: 40 })), OperationFailureCode.Invalid);
+    expectFailure(applyOperation(deck, resize({})), OperationFailureCode.Invalid);
+  });
+
+  test("rejects sizes outside the allowed ranges", () => {
+    expect(deckOperationSchema.safeParse(resize({ columnSplit: 80 })).success).toBe(false);
+    expect(deckOperationSchema.safeParse(resize({ blockSizes: [{ blockId: "block_a", size: 5 }] })).success).toBe(false);
+  });
+});

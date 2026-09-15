@@ -11,6 +11,13 @@ import { THEMES } from "@/features/themes/utils/themes";
 import { EXPORT_SLIDE_SIZE, exportSlidePng, slideFileName, waitForSlideAssets } from "../utils/slide-export";
 
 /**
+ * Safari and Firefox can print on their own paper size and ignore the 1280×720 page. Slides then
+ * fill the page width instead of being cut off: text already scales with the slide, and chart
+ * drawings stretch to their box, which keeps its proportions.
+ */
+const PRINT_FIT_CLASSES = "print:w-full! print:[&_.recharts-wrapper]:size-full! print:[&_.recharts-surface]:size-full!";
+
+/**
  * Every slide of a deck at export size, one per printed page. Printing is enabled once images
  * and charts are ready; each slide can also be downloaded as a PNG.
  */
@@ -113,7 +120,7 @@ export function PrintDeck({ deckId }: { deckId: string }) {
                 <div
                   data-export-slide={slide.id}
                   style={{ width: EXPORT_SLIDE_SIZE.width }}
-                  className="shadow-md print:shadow-none"
+                  className={`shadow-md print:shadow-none ${PRINT_FIT_CLASSES}`}
                 >
                   <SlideRenderer slide={slide} theme={theme} imageLoading="eager" />
                 </div>

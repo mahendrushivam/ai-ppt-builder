@@ -1,5 +1,5 @@
-import type { Block, DeckOperation, Slide, SlideLayout, SlidePatch } from "@/features/deck/types";
-import { useDecksStore } from "@/features/decks/hooks/use-decks-store";
+import type { Block, DeckOperation, Slide, SlideLayout, SlidePatch, SlideResize } from "@/features/deck/types";
+import { type ChangeGroup, ChangeGroupKind, useDecksStore } from "@/features/decks/hooks/use-decks-store";
 import type { ThemeId } from "@/features/themes/types";
 import { createStarterSlide, replaceBlock } from "../utils/slide-editing";
 
@@ -9,8 +9,8 @@ import { createStarterSlide, replaceBlock } from "../utils/slide-editing";
  * `onError` so the editor can explain them.
  */
 export function useSlideActions(deckId: string, onError: (message: string) => void) {
-  function apply(operation: DeckOperation): boolean {
-    const result = useDecksStore.getState().applyOperation(deckId, operation);
+  function apply(operation: DeckOperation, group: ChangeGroup | null = null): boolean {
+    const result = useDecksStore.getState().applyOperation(deckId, operation, group);
     if (!result.ok) onError(result.message);
     return result.ok;
   }
@@ -22,13 +22,17 @@ export function useSlideActions(deckId: string, onError: (message: string) => vo
       ?.slides.find((candidate) => candidate.id === slideId);
   }
 
-  function applyToSlide(slideId: string, buildOperation: (slide: Slide) => DeckOperation): boolean {
+  function applyToSlide(
+    slideId: string,
+    buildOperation: (slide: Slide) => DeckOperation,
+    group: ChangeGroup | null = null,
+  ): boolean {
     const slide = currentSlide(slideId);
     if (!slide) {
       onError("That slide no longer exists.");
       return false;
     }
-    return apply(buildOperation(slide));
+    return apply(buildOperation(slide), group);
   }
 
   return {
@@ -38,12 +42,13 @@ export function useSlideActions(deckId: string, onError: (message: string) => vo
       return apply({ type: "slide.add", slide, afterSlideId }) ? slide.id : null;
     },
     updateSlide(slideId: string, patch: SlidePatch): boolean {
-      return applyToSlide(slideId, (slide) => ({
-        type: "slide.update",
+      // Quick edits to the same fields, such as typing a title, become one undo step.
+      const group = { kind: ChangeGroupKind.Typing, id: `${slideId}:${Object.keys(patch).sort().join(",")}` };
+      return applyToSlide(
         slideId,
-        baseRevision: slide.revision,
-        patch,
-      }));
+        (slide) => ({ type: "slide.update", slideId, baseRevision: slide.revision, patch }),
+        group,
+      );
     },
     /**
      * Changes one block based on the slide as it is in the store now. For changes that finish
@@ -69,6 +74,20 @@ export function useSlideActions(deckId: string, onError: (message: string) => vo
     },
     moveSlide(slideId: string, afterSlideId: string | null): boolean {
       return apply({ type: "slide.move", slideId, afterSlideId });
+    },
+    /** Moves a block to `toIndex` in a column, counted without the moved block. */
+    moveBlock(slideId: string, blockId: string, toColumnId: string, toIndex: number): boolean {
+      return applyToSlide(slideId, (slide) => ({
+        type: "block.move",
+        slideId,
+        baseRevision: slide.revision,
+        blockId,
+        toColumnId,
+        toIndex,
+      }));
+    },
+    resizeSlide(slideId: string, resize: SlideResize): boolean {
+      return applyToSlide(slideId, (slide) => ({ type: "slide.resize", slideId, baseRevision: slide.revision, ...resize }));
     },
     changeLayout(slideId: string, layout: SlideLayout): boolean {
       return applyToSlide(slideId, (slide) => ({

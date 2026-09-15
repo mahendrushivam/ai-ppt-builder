@@ -20,7 +20,7 @@ export function serializeDeckForModel(deck: Deck): string {
 
 function serializeSlide(slide: Slide, position: number): string[] {
   const lines = [
-    `${position}. id=${slide.id} layout=${slide.layout} align=${slide.hints.align} columnRatio=${slide.hints.columnRatio}`,
+    `${position}. id=${slide.id} layout=${slide.layout} align=${slide.hints.align} columnSplit=${slide.hints.columnSplit}`,
     `   title: ${quote(slide.title)}`,
   ];
   if (slide.subtitle !== null) lines.push(`   subtitle: ${quote(slide.subtitle)}`);
@@ -29,7 +29,10 @@ function serializeSlide(slide: Slide, position: number): string[] {
     const heading = column.heading === null ? "" : ` heading=${quote(column.heading)}`;
     lines.push(`   column ${index + 1}${heading}:`);
     if (column.blocks.length === 0) lines.push("     (empty)");
-    for (const block of column.blocks) lines.push(`     - ${serializeBlock(block)}`);
+    for (const block of column.blocks) {
+      const height = block.size === undefined ? "" : `[height ${block.size}%] `;
+      lines.push(`     - ${height}${serializeBlock(block)}`);
+    }
   });
 
   if (slide.notes !== "") lines.push(`   notes: ${quote(slide.notes)}`);

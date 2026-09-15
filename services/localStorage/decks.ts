@@ -1,14 +1,24 @@
 import { z } from "zod";
 import type { Deck } from "@/features/deck/types";
-import { deckSchema } from "@/features/deck/utils/schema";
+import { COLUMN_SPLIT, deckSchema } from "@/features/deck/utils/schema";
 
 export const DECKS_STORAGE_KEY = "ai-ppt-builder:decks";
 export const DECKS_BACKUP_STORAGE_KEY = `${DECKS_STORAGE_KEY}:backup`;
 
+/** Version 2 stores column widths as a percent split instead of three ratios. */
+const DECKS_STORAGE_VERSION = 2;
+
 const storedDecksSchema = z.object({
-  version: z.literal(1),
+  version: z.literal([1, DECKS_STORAGE_VERSION]),
   decks: z.array(z.unknown()),
 });
+
+/** The split for each ratio version 1 stored as `columnRatio`. */
+const VERSION_1_COLUMN_SPLITS: Record<string, number> = {
+  "1:1": COLUMN_SPLIT.equal,
+  "2:1": COLUMN_SPLIT.widerLeft,
+  "1:2": COLUMN_SPLIT.widerRight,
+};
 
 export type LoadDecksResult = {
   decks: Deck[];
@@ -42,8 +52,9 @@ export function loadDecks(): LoadDecksResult {
     };
   }
 
+  const { version } = stored.data;
   const decks = stored.data.decks.flatMap((candidate) => {
-    const parsed = deckSchema.safeParse(candidate);
+    const parsed = deckSchema.safeParse(version === 1 ? migrateVersion1Deck(candidate) : candidate);
     return parsed.success ? [parsed.data] : [];
   });
   const skippedCount = stored.data.decks.length - decks.length;
@@ -57,7 +68,7 @@ export function loadDecks(): LoadDecksResult {
 
 export function saveDecks(decks: Deck[]): SaveDecksResult {
   try {
-    localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify({ version: 1, decks }));
+    localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify({ version: DECKS_STORAGE_VERSION, decks }));
     return { ok: true };
   } catch (error) {
     const storageFull = error instanceof DOMException && error.name === "QuotaExceededError";
@@ -68,6 +79,24 @@ export function saveDecks(decks: Deck[]): SaveDecksResult {
         : `Recent changes could not be saved (${describeError(error)}).`,
     };
   }
+}
+
+/** Replaces version 1's `columnRatio` hint with `columnSplit`. Anything else is left for validation. */
+function migrateVersion1Deck(candidate: unknown): unknown {
+  if (!isRecord(candidate) || !Array.isArray(candidate.slides)) return candidate;
+  return {
+    ...candidate,
+    slides: candidate.slides.map((slide: unknown) => {
+      if (!isRecord(slide) || !isRecord(slide.hints) || !("columnRatio" in slide.hints)) return slide;
+      const { columnRatio, ...hints } = slide.hints;
+      const columnSplit = typeof columnRatio === "string" ? VERSION_1_COLUMN_SPLITS[columnRatio] : undefined;
+      return { ...slide, hints: { ...hints, columnSplit: columnSplit ?? COLUMN_SPLIT.equal } };
+    }),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseJson(raw: string): unknown {

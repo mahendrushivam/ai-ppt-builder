@@ -42,6 +42,8 @@ export type Deck = z.infer<typeof deckSchema>;
 
 export type SlidePatch = z.infer<typeof slidePatchSchema>;
 export type DeckOperation = z.infer<typeof deckOperationSchema>;
+/** The sizes a `slide.resize` operation changes. */
+export type SlideResize = Pick<Extract<DeckOperation, { type: "slide.resize" }>, "columnSplit" | "blockSizes">;
 
 export type OperationFailure = {
   ok: false;

@@ -137,6 +137,8 @@ async function withResolvedImages(
         : operation;
     case "slide.delete":
     case "slide.move":
+    case "block.move":
+    case "slide.resize":
     case "deck.rename":
     case "deck.setTheme":
       return operation;
@@ -246,6 +248,10 @@ function summarize(before: Deck, after: Deck, operation: DeckOperation): string 
       return `Moved the slide; it is now ${describeSlide(after, operation.slideId)}.`;
     case "slide.delete":
       return `Deleted ${describeSlide(before, operation.slideId)}.`;
+    case "block.move":
+      return `Moved a block on ${describeSlide(after, operation.slideId)}.`;
+    case "slide.resize":
+      return `Resized content on ${describeSlide(after, operation.slideId)}.`;
     case "deck.rename":
     case "deck.setTheme":
       return "Updated the deck.";

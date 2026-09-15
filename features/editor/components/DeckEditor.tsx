@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Redo2Icon, Undo2Icon } from "lucide-react";
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { ColorModeMenu } from "@/theme/color-mode-menu";
-import { buttonClassName } from "@/design-system/components/button";
+import { Button, buttonClassName } from "@/design-system/components/button";
 import { ConfirmDialog } from "@/design-system/components/confirm-dialog";
 import { Notice } from "@/design-system/components/notice";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/components/tabs";
@@ -18,6 +19,7 @@ import { DecksStatus, useDecksStore } from "@/features/decks/hooks/use-decks-sto
 import { ExportMenu } from "@/features/export/components/ExportMenu";
 import { ThemeSelector } from "@/features/themes/components/ThemeSelector";
 import { THEMES } from "@/features/themes/utils/themes";
+import { useDeckHistory } from "../hooks/use-deck-history";
 import { useSlideActions } from "../hooks/use-slide-actions";
 import { editFieldId, selectionAfterDelete } from "../utils/slide-editing";
 import { AddSlideMenu } from "./AddSlideMenu";
@@ -35,6 +37,7 @@ export function DeckEditor({ deckId }: { deckId: string }) {
   const [sidePanel, setSidePanel] = useState<"chat" | "slide">("chat");
   const [actionError, setActionError] = useState<string | null>(null);
   const actions = useSlideActions(deckId, setActionError);
+  const history = useDeckHistory(deckId, setActionError);
   const generation = useGeneration(deckId);
 
   if (status === DecksStatus.Loading) {
@@ -107,6 +110,21 @@ export function DeckEditor({ deckId }: { deckId: string }) {
           className="max-w-md min-w-40 flex-1 font-medium"
         />
         <div className="ml-auto flex items-center gap-3">
+          <div role="group" aria-label="History" className="flex items-center gap-0.5">
+            <Button size="icon" variant="ghost" aria-label="Undo" title="Undo (Ctrl+Z / ⌘Z)" disabled={!history.canUndo} onClick={history.undo}>
+              <Undo2Icon aria-hidden />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Redo"
+              title="Redo (Shift+Ctrl+Z / ⇧⌘Z)"
+              disabled={!history.canRedo}
+              onClick={history.redo}
+            >
+              <Redo2Icon aria-hidden />
+            </Button>
+          </div>
           <ExportMenu deck={deck} slide={selectedSlide} slideNumber={selectedIndex + 1} onError={setActionError} />
           <ThemeSelector value={deck.themeId} onChange={(themeId) => actions.setTheme(themeId)} />
           <ColorModeMenu />
@@ -158,6 +176,10 @@ export function DeckEditor({ deckId }: { deckId: string }) {
                 theme={theme}
                 onEditTarget={editTarget}
                 onChangeColumns={(columns) => actions.updateSlide(selectedSlide.id, { columns })}
+                onMoveBlock={(blockId, toColumnId, toIndex) =>
+                  actions.moveBlock(selectedSlide.id, blockId, toColumnId, toIndex)
+                }
+                onResize={(resize) => actions.resizeSlide(selectedSlide.id, resize)}
               />
             )
           )}

@@ -41,6 +41,26 @@ describe("DeckEditor", () => {
     expect(currentDeck().slides.map((slide) => slide.title)).toEqual(["Pricing"]);
   });
 
+  test("undoes and redoes an edit with the header buttons and keyboard shortcuts", async () => {
+    const { user, currentDeck } = renderEditor(deckWith(contentSlide("a")));
+
+    await user.click(screen.getByRole("tab", { name: "Slide settings" }));
+    const title = screen.getByLabelText("Title");
+    await user.clear(title);
+    await user.type(title, "Pricing");
+    expect(screen.getByRole("button", { name: "Redo" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(currentDeck().slides[0].title).toBe("Slide a");
+    expect(canvas().getByRole("heading", { name: "Slide a" })).toBeInTheDocument();
+
+    await user.keyboard("{Control>}{Shift>}z{/Shift}{/Control}");
+    expect(currentDeck().slides[0].title).toBe("Pricing");
+
+    await user.keyboard("{Control>}z{/Control}");
+    expect(currentDeck().slides[0].title).toBe("Slide a");
+  });
+
   test("edits bullet points and shows them on the slide", async () => {
     const { user } = renderEditor(deckWith(contentSlide("a", [bullets("list", ["Old"])])));
 

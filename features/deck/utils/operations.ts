@@ -9,6 +9,7 @@ import {
   type Slide,
   type SlideLayout,
 } from "../types";
+import { applyResize } from "./block-sizes";
 import { createColumn } from "./create";
 import { deckTitleSchema, LAYOUT_COLUMN_COUNT, LIMITS, slideSchema } from "./schema";
 
@@ -30,6 +31,10 @@ export function applyOperation(deck: Deck, operation: DeckOperation): OperationR
       return moveSlide(deck, operation);
     case "slide.changeLayout":
       return changeLayout(deck, operation);
+    case "block.move":
+      return moveBlock(deck, operation);
+    case "slide.resize":
+      return resizeSlide(deck, operation);
     case "deck.rename":
       return renameDeck(deck, operation);
     case "deck.setTheme":
@@ -117,6 +122,67 @@ function changeLayout(
     columns: nextColumns,
     revision: slide.revision + 1,
   });
+}
+
+function moveBlock(
+  deck: Deck,
+  { slideId, baseRevision, blockId, toColumnId, toIndex }: OperationOf<"block.move">,
+): OperationResult {
+  const found = findSlideForEdit(deck, slideId, baseRevision);
+  if (!found.ok) return found;
+
+  const { slide, index } = found;
+  const source = slide.columns.find((column) => column.blocks.some((block) => block.id === blockId));
+  const block = source?.blocks.find((candidate) => candidate.id === blockId);
+  if (!source || !block) return failure(OperationFailureCode.NotFound, `Block "${blockId}" is not on slide "${slideId}".`);
+  const target = slide.columns.find((column) => column.id === toColumnId);
+  if (!target) return failure(OperationFailureCode.NotFound, `Column "${toColumnId}" is not on slide "${slideId}".`);
+
+  const remaining = target.blocks.filter((candidate) => candidate.id !== blockId);
+  if (toIndex > remaining.length) {
+    return failure(OperationFailureCode.Invalid, `Position ${toIndex} is past the end of the column.`);
+  }
+  if (target === source && source.blocks.indexOf(block) === toIndex) return { ok: true, deck };
+  if (remaining.length >= LIMITS.blocksPerColumn) {
+    return failure(OperationFailureCode.Invalid, `A column can have at most ${LIMITS.blocksPerColumn} blocks.`);
+  }
+
+  const columns = slide.columns.map((column) => {
+    if (column === target) return { ...column, blocks: remaining.toSpliced(toIndex, 0, block) };
+    if (column === source) return { ...column, blocks: column.blocks.filter((candidate) => candidate.id !== blockId) };
+    return column;
+  });
+  return replaceSlide(deck, index, { ...slide, columns, revision: slide.revision + 1 });
+}
+
+function resizeSlide(
+  deck: Deck,
+  { slideId, baseRevision, columnSplit, blockSizes }: OperationOf<"slide.resize">,
+): OperationResult {
+  const found = findSlideForEdit(deck, slideId, baseRevision);
+  if (!found.ok) return found;
+  if (columnSplit === undefined && blockSizes === undefined) {
+    return failure(OperationFailureCode.Invalid, "The resize does not change any size.");
+  }
+
+  const { slide, index } = found;
+  if (columnSplit !== undefined && slide.columns.length !== 2) {
+    return failure(OperationFailureCode.Invalid, "Only slides with two columns have a column split.");
+  }
+
+  const sizes = new Map(blockSizes?.map(({ blockId, size }) => [blockId, size]));
+  const blockIds = new Set(slide.columns.flatMap((column) => column.blocks.map((block) => block.id)));
+  const unknownId = [...sizes.keys()].find((blockId) => !blockIds.has(blockId));
+  if (unknownId) return failure(OperationFailureCode.NotFound, `Block "${unknownId}" is not on slide "${slideId}".`);
+
+  // The renderer only uses heights when every block in a column has one.
+  const isResized = (column: Column) => column.blocks.some((block) => sizes.has(block.id));
+  if (slide.columns.some((column) => isResized(column) && !column.blocks.every((block) => sizes.has(block.id)))) {
+    return failure(OperationFailureCode.Invalid, "Block sizes must be given for every block in a column.");
+  }
+
+  const resized = applyResize(slide, { columnSplit, blockSizes });
+  return replaceSlide(deck, index, { ...resized, revision: slide.revision + 1 });
 }
 
 function renameDeck(deck: Deck, { title }: OperationOf<"deck.rename">): OperationResult {

@@ -83,14 +83,14 @@ describe("materializeSlide", () => {
           ],
         },
       ],
-      hints: { columnRatio: "2:1" },
+      hints: { columnSplit: 66.67 },
     });
 
     const slide = materializeSlide(input);
 
     expect(slideSchema.safeParse(slide).success).toBe(true);
     expect(slide.revision).toBe(0);
-    expect(slide.hints).toEqual({ align: "left", columnRatio: "2:1" });
+    expect(slide.hints).toEqual({ align: "left", columnSplit: 66.67 });
     const ids = collectIds(slide);
     expect(new Set(ids).size).toBe(ids.length);
     expect(slide.columns[1].blocks[1]).toMatchObject({ type: "image", image: null });
@@ -163,7 +163,7 @@ describe("materializeSlidePatch", () => {
     if (!result.ok) throw new Error(result.message);
     const [updated] = result.deck.slides;
     expect(updated.title).toBe("Our team");
-    expect(updated.hints).toEqual({ align: "center", columnRatio: "1:1" });
+    expect(updated.hints).toEqual({ align: "center", columnSplit: 50 });
     expect(updated.columns).toBe(current.columns);
   });
 });

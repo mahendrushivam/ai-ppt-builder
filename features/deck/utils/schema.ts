@@ -27,6 +27,12 @@ export const LIMITS = {
   slidesPerDeck: 30,
 } as const;
 
+/** Width of the first column on two-column slides, in percent of the content width. */
+export const COLUMN_SPLIT = { min: 25, max: 75, equal: 50, widerLeft: 66.67, widerRight: 33.33 } as const;
+
+/** Smallest share of a column's height a block can be given, in percent. */
+export const MIN_BLOCK_SIZE = 10;
+
 export const SLIDE_LAYOUTS = ["title", "section", "content", "two-column", "comparison"] as const;
 export const slideLayoutSchema = z.enum(SLIDE_LAYOUTS);
 
@@ -180,30 +186,39 @@ const bulletItemSchema = z.object({
   level: z.literal([0, 1]),
 });
 
+/** A block's share of its column's height, in percent. */
+export const blockSizeSchema = z.number().min(MIN_BLOCK_SIZE).max(100);
+
+const blockBase = {
+  id: idSchema,
+  /** Blocks without a size take the height of their content; see `blockSizesOf`. */
+  size: blockSizeSchema.optional(),
+};
+
 export const blockSchema = z.discriminatedUnion("type", [
   z.object({
-    id: idSchema,
+    ...blockBase,
     type: z.literal(BlockType.Bullets),
     items: z.array(bulletItemSchema).max(LIMITS.bulletsPerBlock),
   }),
   z.object({
-    id: idSchema,
+    ...blockBase,
     type: z.literal(BlockType.Paragraph),
     text: z.string().max(LIMITS.paragraph),
   }),
   z
-    .object({ id: idSchema, type: z.literal(BlockType.Table), ...tableFields })
+    .object({ ...blockBase, type: z.literal(BlockType.Table), ...tableFields })
     .superRefine(reportIssues(tableShapeIssues)),
   z
     .object({
-      id: idSchema,
+      ...blockBase,
       type: z.literal(BlockType.Chart),
       title: z.string().max(LIMITS.chartTitle).nullable(),
       ...chartFields,
     })
     .superRefine(reportIssues(chartShapeIssues)),
   z.object({
-    id: idSchema,
+    ...blockBase,
     type: z.literal(BlockType.Image),
     /** Search query the image was (or will be) resolved from. Empty while the user is still typing one. */
     query: z.string().max(LIMITS.imageQuery),
@@ -226,7 +241,11 @@ export const columnSchema = z.object({
 
 export const layoutHintsSchema = z.object({
   align: z.enum(["left", "center"]),
-  columnRatio: z.enum(["1:1", "2:1", "1:2"]),
+  columnSplit: z
+    .number()
+    .min(COLUMN_SPLIT.min)
+    .max(COLUMN_SPLIT.max)
+    .describe("Width of the first of two columns, in percent of the content width (25-75). 50 makes equal columns."),
 });
 
 const slideShape = {
@@ -320,6 +339,23 @@ export const deckOperationSchema = z.discriminatedUnion("type", [
     layout: slideLayoutSchema,
     /** Explicit content for the new layout; when omitted, existing blocks are redistributed. */
     columns: z.array(columnSchema).optional(),
+  }),
+  z.object({
+    type: z.literal("block.move"),
+    slideId: idSchema,
+    baseRevision: revisionSchema,
+    blockId: idSchema,
+    toColumnId: idSchema,
+    /** Position in the target column, counted without the moved block. */
+    toIndex: z.int().min(0),
+  }),
+  z.object({
+    type: z.literal("slide.resize"),
+    slideId: idSchema,
+    baseRevision: revisionSchema,
+    columnSplit: layoutHintsSchema.shape.columnSplit.optional(),
+    /** Heights for every block of each column being resized; `null` returns a block to its content height. */
+    blockSizes: z.array(z.object({ blockId: idSchema, size: blockSizeSchema.nullable() })).optional(),
   }),
   z.object({
     type: z.literal("deck.rename"),

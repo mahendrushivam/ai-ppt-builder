@@ -10,6 +10,7 @@ import {
 } from "@/features/deck/types";
 import { createId, defaultHintsForLayout } from "@/features/deck/utils/create";
 import {
+  blockSizeSchema,
   chartFields,
   chartShapeIssues,
   columnCountIssues,
@@ -30,21 +31,35 @@ import { type BlockInput, type ColumnInput, type SlideInput, type SlidePatchInpu
 
 const requiredText = (max: number) => z.string().trim().min(1).max(max);
 
+/** Lets the model keep heights the user set by dragging when it rewrites a column. */
+const blockSizeInput = {
+  size: blockSizeSchema
+    .optional()
+    .describe(
+      "Share of the column height in percent. Repeat the height shown for a block in the deck context when rewriting its column; leave out for automatic height.",
+    ),
+};
+
 export const blockInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(BlockType.Bullets),
     items: z.array(requiredText(LIMITS.bulletText)).min(1).max(LIMITS.bulletsPerBlock),
+    ...blockSizeInput,
   }),
   z.object({
     type: z.literal(BlockType.Paragraph),
     text: requiredText(LIMITS.paragraph),
+    ...blockSizeInput,
   }),
-  z.object({ type: z.literal(BlockType.Table), ...tableFields }).superRefine(reportIssues(tableShapeIssues)),
+  z
+    .object({ type: z.literal(BlockType.Table), ...tableFields, ...blockSizeInput })
+    .superRefine(reportIssues(tableShapeIssues)),
   z
     .object({
       type: z.literal(BlockType.Chart),
       title: requiredText(LIMITS.chartTitle).nullable().default(null),
       ...chartFields,
+      ...blockSizeInput,
     })
     .superRefine(reportIssues(chartShapeIssues)),
   z.object({
@@ -52,6 +67,7 @@ export const blockInputSchema = z.discriminatedUnion("type", [
     /** Search query for a stock image; the server resolves it to a real image. */
     query: requiredText(LIMITS.imageQuery),
     alt: requiredText(LIMITS.imageAlt),
+    ...blockSizeInput,
   }),
 ]);
 
@@ -126,7 +142,7 @@ export function materializeColumns(inputs: ColumnInput[], current?: Slide): Colu
   return inputs.map((column) => ({
     id: createId("column"),
     heading: column.heading,
-    blocks: column.blocks.map((block) => materializeBlock(block, knownImages)),
+    blocks: column.blocks.map((block) => ({ ...materializeBlock(block, knownImages), size: block.size })),
   }));
 }
 
@@ -144,7 +160,7 @@ export function materializeSlidePatch(input: SlidePatchInput, current: Slide): S
     notes: input.notes === current.notes ? undefined : input.notes,
     columns: columns && contentKey(columns) === contentKey(current.columns) ? undefined : columns,
     hints:
-      hints && hints.align === current.hints.align && hints.columnRatio === current.hints.columnRatio ? undefined : hints,
+      hints && hints.align === current.hints.align && hints.columnSplit === current.hints.columnSplit ? undefined : hints,
   };
 }
 
@@ -193,7 +209,7 @@ function materializeBlock(input: BlockInput, knownImages: Map<string, ResolvedIm
 function mergeHints(base: LayoutHints, overrides: Partial<LayoutHints>): LayoutHints {
   return {
     align: overrides.align ?? base.align,
-    columnRatio: overrides.columnRatio ?? base.columnRatio,
+    columnSplit: overrides.columnSplit ?? base.columnSplit,
   };
 }
 

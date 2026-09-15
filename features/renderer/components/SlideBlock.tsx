@@ -21,14 +21,16 @@ export function SlideBlock({ block, chartColors, imageLoading }: SlideBlockProps
     case BlockType.Bullets: {
       const items = block.items.filter((item) => item.text.trim() !== "");
       if (items.length === 0) return <Placeholder editTarget={editTarget} text="Empty list" />;
+      // Markers take the item's accent color and the text keeps the slide's. PNG export can't copy
+      // `::marker` styles, so the color is set on the item itself.
       return (
         <ul
           data-edit-target={editTarget}
-          className="flex list-disc flex-col pl-[2.4cqw] [font-size:var(--slide-body-size)] gap-[calc(var(--slide-gap)*0.6)] marker:text-(--slide-accent)"
+          className="flex list-disc flex-col pl-[2.4cqw] [font-size:var(--slide-body-size)] gap-[calc(var(--slide-gap)*0.6)] text-(--slide-accent)"
         >
           {items.map((item) => (
             <li key={item.id} className={item.level === 1 ? "ml-[2.4cqw] list-[circle]" : undefined}>
-              {item.text}
+              <span className="text-(--slide-text)">{item.text}</span>
             </li>
           ))}
         </ul>

@@ -19,7 +19,7 @@ const deck: Deck = {
       subtitle: "Product team",
       columns: [],
       notes: "Welcome everyone",
-      hints: { align: "center", columnRatio: "1:1" },
+      hints: { align: "center", columnSplit: 50 },
     },
     {
       id: "slide_b",
@@ -28,7 +28,7 @@ const deck: Deck = {
       title: "Plans",
       subtitle: null,
       notes: "",
-      hints: { align: "left", columnRatio: "2:1" },
+      hints: { align: "left", columnSplit: 66.67 },
       columns: [
         {
           id: "column_internal_1",
@@ -36,13 +36,14 @@ const deck: Deck = {
           blocks: [
             {
               id: "block_1",
+              size: 60,
               type: BlockType.Bullets,
               items: [
                 { id: "item_1", text: 'Say "hi"', level: 0 },
                 { id: "item_2", text: "Detail", level: 1 },
               ],
             },
-            { id: "block_2", type: BlockType.Table, header: ["Seats", "Price"], rows: [["5", "$10"]] },
+            { id: "block_2", size: 40, type: BlockType.Table, header: ["Seats", "Price"], rows: [["5", "$10"]] },
           ],
         },
         {
@@ -73,15 +74,15 @@ describe("serializeDeckForModel", () => {
         'Deck title: "Q3 Roadmap"',
         "Theme: midnight",
         "Slides: 2",
-        "1. id=slide_a layout=title align=center columnRatio=1:1",
+        "1. id=slide_a layout=title align=center columnSplit=50",
         '   title: "Q3 Roadmap"',
         '   subtitle: "Product team"',
         '   notes: "Welcome everyone"',
-        "2. id=slide_b layout=comparison align=left columnRatio=2:1",
+        "2. id=slide_b layout=comparison align=left columnSplit=66.67",
         '   title: "Plans"',
         '   column 1 heading="Basic":',
-        '     - bullets: "Say \\"hi\\"", (sub) "Detail"',
-        '     - table: header=["Seats","Price"] rows=[["5","$10"]]',
+        '     - [height 60%] bullets: "Say \\"hi\\"", (sub) "Detail"',
+        '     - [height 40%] table: header=["Seats","Price"] rows=[["5","$10"]]',
         "   column 2:",
         '     - chart bar title="Revenue": categories=["Q1","Q2"] series: "2026"=[1,2.5]',
         '     - image: query="team" alt="Team photo"',

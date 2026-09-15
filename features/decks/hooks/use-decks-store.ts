@@ -4,6 +4,19 @@ import { createDeck } from "@/features/deck/utils/create";
 import { applyOperation as applyOperationToDeck } from "@/features/deck/utils/operations";
 import type { LoadDecksResult } from "@/services/localStorage/decks";
 
+/** How deck changes are grouped into one undo step. */
+export enum ChangeGroupKind {
+  /** Quick edits to the same fields, such as typing, merge while they keep coming. */
+  Typing = "typing",
+  /** Every change of one AI chat turn or generation run is one step. */
+  Run = "run",
+}
+
+export type ChangeGroup = { kind: ChangeGroupKind; id: string };
+
+/** The latest change to a deck's content, read by the editor's undo history. */
+export type DeckChange = { deckId: string; before: Deck; after: Deck; group: ChangeGroup | null };
+
 export enum DecksStatus {
   /** Saved decks have not been read from browser storage yet. */
   Loading = "loading",
@@ -15,12 +28,15 @@ type DecksState = {
   decks: Deck[];
   loadWarning: string | null;
   saveError: string | null;
+  lastChange: DeckChange | null;
 
   hydrate: (result: LoadDecksResult) => void;
   createDeck: () => Deck;
   deleteDeck: (deckId: string) => void;
   /** The only way deck content changes: applies a DeckOperation and stamps `updatedAt`. */
-  applyOperation: (deckId: string, operation: DeckOperation) => OperationResult;
+  applyOperation: (deckId: string, operation: DeckOperation, group?: ChangeGroup | null) => OperationResult;
+  /** Puts back a deck from undo or redo. It is not recorded as a new change. */
+  restoreDeck: (deck: Deck) => void;
   setSaveError: (message: string | null) => void;
   dismissLoadWarning: () => void;
 };
@@ -30,6 +46,7 @@ export const useDecksStore = create<DecksState>()((set, get) => ({
   decks: [],
   loadWarning: null,
   saveError: null,
+  lastChange: null,
 
   hydrate: ({ decks, warning }) => set({ status: DecksStatus.Ready, decks, loadWarning: warning }),
 
@@ -42,7 +59,7 @@ export const useDecksStore = create<DecksState>()((set, get) => ({
   deleteDeck: (deckId) =>
     set((state) => ({ decks: state.decks.filter((deck) => deck.id !== deckId) })),
 
-  applyOperation: (deckId, operation) => {
+  applyOperation: (deckId, operation, group = null) => {
     const deck = get().decks.find((candidate) => candidate.id === deckId);
     if (!deck) {
       return { ok: false, code: OperationFailureCode.NotFound, message: "This presentation no longer exists." };
@@ -54,8 +71,14 @@ export const useDecksStore = create<DecksState>()((set, get) => ({
     const updated: Deck = { ...result.deck, updatedAt: new Date().toISOString() };
     set((state) => ({
       decks: state.decks.map((candidate) => (candidate.id === deckId ? updated : candidate)),
+      lastChange: { deckId, before: deck, after: updated, group },
     }));
     return { ok: true, deck: updated };
+  },
+
+  restoreDeck: (deck) => {
+    const restored: Deck = { ...deck, updatedAt: new Date().toISOString() };
+    set((state) => ({ decks: state.decks.map((candidate) => (candidate.id === deck.id ? restored : candidate)) }));
   },
 
   setSaveError: (message) => {

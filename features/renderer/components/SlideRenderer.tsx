@@ -1,4 +1,5 @@
 import type { Slide } from "@/features/deck/types";
+import { blockSizesOf } from "@/features/deck/utils/block-sizes";
 import type { Theme } from "@/features/themes/types";
 import { themeStyle } from "@/features/themes/utils/theme-style";
 import { type ImageLoading, SlideBlock } from "./SlideBlock";
@@ -8,12 +9,6 @@ type SlideRendererProps = {
   theme: Theme;
   /** `eager` for print and export, where every image must load even when it is off screen. */
   imageLoading?: ImageLoading;
-};
-
-const COLUMN_GRID: Record<Slide["hints"]["columnRatio"], string> = {
-  "1:1": "grid-cols-2",
-  "2:1": "grid-cols-[2fr_1fr]",
-  "1:2": "grid-cols-[1fr_2fr]",
 };
 
 /**
@@ -63,7 +58,11 @@ type ContentLayoutProps = { slide: Slide; chartColors: readonly string[]; imageL
 
 function ContentLayout({ slide, chartColors, imageLoading }: ContentLayoutProps) {
   const centered = slide.hints.align === "center";
-  const columnGrid = slide.columns.length === 2 ? COLUMN_GRID[slide.hints.columnRatio] : "grid-cols-1";
+  // `minmax(0, …)` keeps long content from widening a column past its share.
+  const columnTemplate =
+    slide.columns.length === 2
+      ? `minmax(0, ${slide.hints.columnSplit}fr) minmax(0, ${100 - slide.hints.columnSplit}fr)`
+      : "minmax(0, 1fr)";
 
   return (
     <div className="flex h-full flex-col gap-[calc(var(--slide-gap)*1.5)] p-(--slide-padding)">
@@ -79,8 +78,10 @@ function ContentLayout({ slide, chartColors, imageLoading }: ContentLayoutProps)
         )}
       </header>
 
-      <div className={`grid min-h-0 flex-1 gap-[calc(var(--slide-gap)*2)] ${columnGrid}`}>
-        {slide.columns.map((column) => (
+      <div className="grid min-h-0 flex-1 gap-[calc(var(--slide-gap)*2)]" style={{ gridTemplateColumns: columnTemplate }}>
+        {slide.columns.map((column) => {
+          const blockSizes = blockSizesOf(column);
+          return (
           <section key={column.id} data-column-id={column.id} className="flex min-h-0 flex-col gap-(--slide-gap)">
             {column.heading && (
               <h3
@@ -90,11 +91,24 @@ function ContentLayout({ slide, chartColors, imageLoading }: ContentLayoutProps)
                 {column.heading}
               </h3>
             )}
-            {column.blocks.map((block) => (
-              <SlideBlock key={block.id} block={block} chartColors={chartColors} imageLoading={imageLoading} />
-            ))}
+            {column.blocks.map((block, index) =>
+              blockSizes ? (
+                // A resized column shares its height between blocks; content that doesn't fit is cut off.
+                <div
+                  key={block.id}
+                  data-block-slot={block.id}
+                  className="flex min-h-0 flex-col overflow-hidden"
+                  style={{ flex: `${blockSizes[index]} 1 0px` }}
+                >
+                  <SlideBlock block={block} chartColors={chartColors} imageLoading={imageLoading} />
+                </div>
+              ) : (
+                <SlideBlock key={block.id} block={block} chartColors={chartColors} imageLoading={imageLoading} />
+              ),
+            )}
           </section>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

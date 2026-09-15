@@ -1,7 +1,7 @@
 import type { ThemeId } from "@/features/themes/types";
 import { DEFAULT_THEME_ID } from "@/features/themes/utils/themes";
 import type { Column, Deck, LayoutHints, Slide, SlideLayout } from "../types";
-import { LAYOUT_COLUMN_COUNT } from "./schema";
+import { COLUMN_SPLIT, LAYOUT_COLUMN_COUNT } from "./schema";
 
 type IdKind = "deck" | "slide" | "column" | "block" | "item" | "upload";
 
@@ -12,7 +12,7 @@ export function createId(kind: IdKind): string {
 
 export function defaultHintsForLayout(layout: SlideLayout): LayoutHints {
   const centered = layout === "title" || layout === "section";
-  return { align: centered ? "center" : "left", columnRatio: "1:1" };
+  return { align: centered ? "center" : "left", columnSplit: COLUMN_SPLIT.equal };
 }
 
 export function createColumn(heading: string | null = null): Column {
