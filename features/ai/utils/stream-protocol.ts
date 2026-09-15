@@ -38,7 +38,7 @@ export const aiStreamEventSchema = z.discriminatedUnion("type", [
 
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 
-export const CHAT_LIMITS = { messageLength: 4000, historyMessages: 12 } as const;
+export const CHAT_LIMITS = { messageLength: 4000, historyMessages: 20 } as const;
 
 /** Body of `POST /api/ai/chat`. The browser owns the deck, so every turn sends a snapshot. */
 export const chatRequestSchema = z.object({
