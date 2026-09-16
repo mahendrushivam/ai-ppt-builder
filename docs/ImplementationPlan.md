@@ -21,6 +21,44 @@ Status: approved · Date: 2026-09-13 · LLM: Sarvam `sarvam-105b`
 
 ---
 
+## Ground rules — the `.claude` rule system (set up before any code)
+
+The first commit of real work was not a feature: it was a set of rules checked into the
+repository at `.claude/`. The brief was going to be built largely through an AI coding agent
+across many sessions, and an agent has no memory between them. Anything not written down is
+re-decided — differently — every time. So the conventions were written first and the code was
+written against them.
+
+`.claude/CLAUDE.md` is deliberately thin (20 lines). It holds no conventions of its own; it is a
+router that tells the agent to read the relevant rule files, apply only those, and prefer an
+existing project pattern when it is more specific than a generic rule. The substance lives in six
+focused files:
+
+| Rule file | Covers |
+|---|---|
+| `architecture.md` | layer responsibilities, feature folders, where external-system code lives |
+| `coding-standards.md` | strict TypeScript, no `any`, no non-null assertions, discriminated unions, error handling |
+| `nextjs-react.md` | App Router, Server Components by default, the client/server boundary, hooks discipline |
+| `ai-presentation.md` | AI output as untrusted data, the seven-step pipeline, streaming, validation, security |
+| `testing.md` | Vitest + RTL + MSW, `test()` over `it()`, behaviour over implementation details |
+| `ui.md` | UX states, accessibility, reuse of design tokens and primitives |
+
+**Why six files instead of one.** Only the rules relevant to the task get loaded, so context stays
+spent on the problem rather than on conventions that don't apply. A schema change reads
+`architecture.md` and `coding-standards.md`; it never pays for the UI rules.
+
+**They are the spec, not suggestions.** The rules are the fixed point the rest of this document is
+written against — §2 derives its pipeline separation from `ai-presentation.md`, §11 derives the
+folder structure from `architecture.md`, and §16 justifies the test stack from `testing.md`. When
+a rule and a convenient shortcut disagree, the rule wins; that is the whole point of writing them
+down before there was any code to rationalise.
+
+**They are versioned with the code.** Because `.claude/` is committed, every session and every
+contributor gets the same constraints, and changing a convention is a reviewable diff rather than
+a private preference.
+
+---
+
 ## 0. Verified facts (spikes run before planning)
 
 These were checked against the real services, not assumed from docs.
@@ -71,6 +109,40 @@ These were checked against the real services, not assumed from docs.
 > Manual edits, AI tool calls, undo/redo and tests all go through `applyOperation(deck, op)`.
 
 This is what makes diff-based editing, coexistence of manual + AI edits, and unified history possible. The AI never returns "a deck"; it returns operations.
+
+### Layered architecture
+
+Responsibilities are split by *kind of work*, not by screen. Each layer may only depend on layers
+below it, which is what keeps the domain testable without React and the renderer reusable outside
+the editor.
+
+| Layer | Responsibility | May depend on | Example |
+|---|---|---|---|
+| Domain | the schema, `DeckOperation`, `applyOperation` — no React, no Zustand, no browser APIs | nothing | `features/deck/` |
+| Types | domain contracts shared across layers | domain | `features/*/types.ts` |
+| Utilities | pure transformations and validation | domain, types | `features/ai/utils/`, `features/editor/utils/` |
+| Services | everything that talks to an external system, grouped by system rather than by feature | domain, utils | `services/ai/`, `services/images/`, `services/localStorage/`, `services/indexedDb/` |
+| Hooks | reusable client behaviour and state wiring | services, utils | `use-chat`, `use-generation`, `use-deck-history` |
+| Components | rendering and user interaction only | hooks, design system | `features/editor/`, `features/ai/components/` |
+| Design system | shared, feature-agnostic primitives and charts | nothing app-specific | `design-system/` |
+
+Consequences worth stating explicitly, because they drove later decisions:
+
+- **The domain layer has no framework.** `features/deck/` imports neither React nor Next.js, so the
+  same `applyOperation` runs in the browser store, in the server's working copy during a chat turn,
+  and directly in unit tests. One implementation, three callers, no mocks.
+- **External systems are a folder, not a pattern.** No repositories, adapters or providers — a
+  service is just the module that owns one external system. `server-only` marks the ones that must
+  never reach the browser (the Sarvam client, the agents, the tool definitions, Openverse, env).
+- **Rendering is pure.** `SlideRenderer` is read-only and takes a slide plus a theme. Editing
+  controls, drop targets and resize handles are layers *over* it, which is why the canvas,
+  thumbnails, print view and PNG export cannot drift apart.
+- **State is separated by lifetime.** Persisted deck data (localStorage), temporary generation state
+  (the chat/generation hooks) and editor/UI state (selection, drag preview) are distinct, so an
+  in-flight AI request can never corrupt saved slides.
+- **Client components are the exception.** Everything is a Server Component until interactivity
+  forces otherwise; `"use client"` appears in 7 modules, and a page is never converted wholesale
+  because one child needs an event handler.
 
 ### System diagram
 

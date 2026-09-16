@@ -1,4 +1,4 @@
-export type ChartSeries = { name: string; values: number[] };
+type ChartSeries = { name: string; values: number[] };
 
 /** Chart data as a grid: one value per category in every series. Each chart type reads it its own way. */
 export type ChartData = { categories: string[]; series: ChartSeries[] };

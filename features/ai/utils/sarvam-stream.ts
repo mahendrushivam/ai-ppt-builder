@@ -15,7 +15,7 @@ const toolCallDeltaSchema = z.object({
   function: z.object({ name: z.string().nullish(), arguments: z.string().nullish() }).nullish(),
 });
 
-export const sarvamChunkSchema = z.object({
+const sarvamChunkSchema = z.object({
   choices: z.array(
     z.object({
       delta: z

@@ -241,4 +241,4 @@ const ImagePreview: React.FC<{ image: ResolvedImage; alt: string }> = ({
   );
 };
 
-export { ImagePreview, ImageEditor };
+export { ImageEditor };

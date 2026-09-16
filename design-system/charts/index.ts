@@ -10,4 +10,4 @@ export { StackedBarChart } from "./stacked-bar-chart";
 export { StackedLineChart } from "./stacked-line-chart";
 export { SunburstChart } from "./sunburst-chart";
 export { TreemapChart } from "./treemap-chart";
-export type { ChartData, ChartProps, ChartSeries } from "./types";
+export type { ChartProps } from "./types";

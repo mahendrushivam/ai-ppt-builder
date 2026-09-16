@@ -6,7 +6,7 @@ export const SARVAM_CHAT_URL = "https://api.sarvam.ai/v1/chat/completions";
 const MODEL = "sarvam-105b";
 const MAX_RETRIES = 2;
 
-export type SarvamToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+type SarvamToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 
 export type SarvamMessage =
   | { role: "system" | "user"; content: string }

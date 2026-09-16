@@ -2,19 +2,67 @@
 
 Describe a presentation, review the outline the AI proposes, and watch the slides appear one by one. Then refine the deck by chatting with the AI or by editing it directly — both work on the same slide data, so neither undoes the other.
 
-**Live app:** _add the Vercel URL here after deploying_
+**Live app:** https://ai-ppt-builder-five.vercel.app/
 
 ## Features
 
-- **Generate from a prompt:** the AI drafts an outline you can edit, then generates the slides one at a time, streamed into the editor as each is ready.
-- **Refine through chat:** "make slide 3 more concise", "add a pricing slide before the conclusion". The AI changes only the slides it needs to, through tool calls.
-- **Edit manually:** edit text, notes, tables, charts and images in the slide settings panel (clicking text on the slide jumps to its field); add, delete, reorder and change the layout of slides; add, replace, move and resize content blocks on the slide.
-- **Rich content:** bullet lists, paragraphs, tables, 12 chart types and images (stock photo search or your own uploads).
-- **Direct manipulation:** drag blocks within and between columns, drag slides in the slide list, drag the gap between columns or blocks to resize them. Everything also works with the keyboard.
-- **Undo/redo** across manual and AI changes.
-- **Themes:** four slide themes, plus light and dark mode for the app.
-- **Multiple presentations**, saved in the browser.
-- **Export:** print to PDF, or download a slide as PNG.
+### Generate a deck from a prompt
+
+- **Two-phase generation.** Describe the deck and pick a slide count (3 to 12). The AI first returns an **outline** — a title, key points and a planned visual for each slide — which you can edit before a single slide is written: rewrite titles and points, reorder slides, and add or remove them.
+- **Slide-by-slide streaming.** Approving the outline generates the slides one at a time, each streamed into the editor the moment it validates, so you watch the deck fill up instead of a spinner.
+- **Progress, cancellation and retry.** The progress panel names the slide currently being written. Stopping keeps every slide generated so far, and a slide that fails can be retried on its own without regenerating the rest.
+- **Visuals are planned, not guessed.** Each outline item carries the kind of visual it wants (`none`, `image`, `chart` or `table`), so the slide writer knows what to produce; image blocks are filled from stock-photo search during generation.
+
+### Refine by chatting
+
+- **Targeted edits.** "Make slide 3 more concise", "add a pricing slide before the conclusion", "turn slide 5 into a two-column comparison". The AI works through five tools — `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `change_layout` — so it changes only the slides it names.
+- **Multi-step requests.** Up to 4 model rounds and 20 applied changes per message. The deck is re-serialized between rounds, so the model sees the result of its own earlier calls and can fix a rejected one.
+- **Selection-aware.** The slide you have selected is sent as context, so "this slide" means what you think it means.
+- **Your edits win.** Every AI change carries the slide revision it was prepared against. If you edited that slide while the AI was working, the change is skipped instead of overwriting you — and the chat tells you which slide it skipped and why.
+- **Stop and retry.** Stopping mid-turn keeps the changes already applied. Errors distinguish rate limiting, a provider outage, a request the provider rejected, an empty response and a cut-off response, and the ones worth retrying show a Retry button.
+- **Chat history** is saved per deck in the browser; the last 20 messages are sent with each request.
+
+### Edit manually
+
+- **Slides.** Add, delete and reorder slides; switch a slide between the five layouts (`title`, `section`, `content`, `two-column`, `comparison`) with existing content redistributed rather than discarded.
+- **Content blocks.** Add, replace, move and resize blocks inside and between columns, up to 4 blocks per column.
+- **Click-to-edit.** Clicking text on the canvas jumps to its field in the slide settings panel, so the slide itself is the navigation.
+- **Per-type editors.** Dedicated editors for tables (add/remove rows and columns, edit cells), charts (type, categories, series, values) and images (search, upload, alt text), plus speaker notes on every slide.
+- **Layout controls.** Text alignment (left or centre) and the column split (25–75%) are part of the slide data, so the AI and the editor change them the same way.
+
+### Content types
+
+| Block | Details |
+| --- | --- |
+| Bullets | Up to 8 per block, 220 characters each |
+| Paragraph | Up to 800 characters |
+| Table | Up to 6 columns × 8 rows, with a header row |
+| Chart | 12 types: bar, stacked bar, line, stacked line, area, stacked area, pie, funnel, treemap, sunburst, sankey, scatter (Recharts) |
+| Image | Openverse stock-photo search or your own upload, with alt text |
+
+Every limit is declared once in `features/deck/utils/schema.ts` and enforced identically for saved decks, manual edits and AI output — a chart with a series shorter than its category list is rejected before it can reach the renderer.
+
+### Direct manipulation and keyboard support
+
+- Drag blocks within a column and between columns, drag slides in the slide list to reorder, and drag the gap between columns or blocks to resize them.
+- All of it works from the keyboard too: `@dnd-kit` was chosen for its keyboard sensors and screen-reader announcements, and resizing uses `react-resizable-panels`.
+- **Undo/redo** with `Cmd`/`Ctrl` + `Z` (add `Shift` to redo), covering manual and AI changes alike — an AI turn undoes as one step, not twenty.
+- `Escape` clears the canvas selection; controls are labelled and focus order follows the layout.
+
+### Themes and appearance
+
+- Four slide themes — **Paper**, **Midnight**, **Editorial** and **Sunset** — each a set of design tokens (fonts, colours, chart palette) applied by the renderer, so switching a theme never touches slide content.
+- Light and dark mode for the app itself, independent of the slide theme.
+
+### Presentations and storage
+
+- Multiple presentations with a dashboard: create, rename inline, open and delete, each with a live thumbnail of its first slide.
+- Decks and chat history are saved in `localStorage`, uploaded images in IndexedDB. Saving is automatic, and a save failure is surfaced rather than swallowed.
+
+### Export
+
+- **Print or save as PDF** — a dedicated print route renders every slide at 1280×720, one per page.
+- **Download a slide as PNG** — the slide is re-rendered off screen at export size, so the file never depends on your window width.
 
 ## Setup
 
@@ -36,13 +84,13 @@ The key is only read on the server (`lib/env.ts`) and is never sent to the brows
 npm run dev        # http://localhost:3000
 ```
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` / `npm start` | Production build and server |
-| `npm test` | Unit and component tests (Vitest) |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` | ESLint |
+| Command                       | What it does                      |
+| ----------------------------- | --------------------------------- |
+| `npm run dev`                 | Development server                |
+| `npm run build` / `npm start` | Production build and server       |
+| `npm test`                    | Unit and component tests (Vitest) |
+| `npm run typecheck`           | TypeScript check                  |
+| `npm run lint`                | ESLint                            |
 
 ### Deploying to Vercel
 
@@ -86,36 +134,36 @@ The browser owns the deck. Each AI request sends a snapshot of the deck; the ser
 
 ### AI pipeline
 
-| Step | Where |
-|---|---|
-| Input | `features/ai/components` (chat panel, prompt and outline review), validated with zod before sending |
-| Orchestration | `services/ai/agents`: `chat-agent.ts` (tool loop, up to 4 rounds), `outline-agent.ts`, `slide-generator.ts` |
-| Tools | `services/ai/tools`: chat tools `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `change_layout`; generation tools `create_outline`, `create_slide`. Tool parameters are JSON Schemas generated from zod. |
-| Model | `services/ai/api/sarvam-client.ts`: `sarvam-105b`, streamed, retried on network and provider errors |
-| Streaming | Upstream: Sarvam's SSE stream. Downstream: NDJSON events (`features/ai/utils/stream-protocol.ts`), read by `services/ai/api/api.ts` |
-| Validation | Model input schemas (`features/ai/utils/slide-input.ts`) → domain objects with ids → `applyOperation` checks |
-| Context | `features/ai/utils/deck-context.ts` describes the deck in compact text: numbered slides with ids, layouts, sizes and block content |
-| State update | Deck store, with the same revision checks as manual edits |
-| Rendering | `SlideRenderer`, which knows nothing about AI |
+| Step          | Where                                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Input         | `features/ai/components` (chat panel, prompt and outline review), validated with zod before sending                                                                                                                 |
+| Orchestration | `services/ai/agents`: `chat-agent.ts` (tool loop, up to 4 rounds), `outline-agent.ts`, `slide-generator.ts`                                                                                                         |
+| Tools         | `services/ai/tools`: chat tools `add_slide`, `update_slide`, `delete_slide`, `move_slide`, `change_layout`; generation tools `create_outline`, `create_slide`. Tool parameters are JSON Schemas generated from zod. |
+| Model         | `services/ai/api/sarvam-client.ts`: `sarvam-105b`, streamed, retried on network and provider errors                                                                                                                 |
+| Streaming     | Upstream: Sarvam's SSE stream. Downstream: NDJSON events (`features/ai/utils/stream-protocol.ts`), read by `services/ai/api/api.ts`                                                                                 |
+| Validation    | Model input schemas (`features/ai/utils/slide-input.ts`) → domain objects with ids → `applyOperation` checks                                                                                                        |
+| Context       | `features/ai/utils/deck-context.ts` describes the deck in compact text: numbered slides with ids, layouts, sizes and block content                                                                                  |
+| State update  | Deck store, with the same revision checks as manual edits                                                                                                                                                           |
+| Rendering     | `SlideRenderer`, which knows nothing about AI                                                                                                                                                                       |
 
 **Two-phase generation:** `/api/ai/outline` returns an outline (titles, key points and a planned visual per slide) that you can edit. `/api/ai/generate` then creates the slides one at a time, each with a forced `create_slide` tool call, and streams each slide into the deck as soon as it is valid. A failed slide can be retried on its own; stopping keeps the slides already generated.
 
 ### Folders
 
-| Folder | Contents |
-|---|---|
-| `app/` | Routes: `/` (presentations), `/decks/[deckId]` (editor), `/decks/[deckId]/print`, and the API route handlers |
-| `features/deck/` | Slide schema (zod), types, `DeckOperation` and `applyOperation` |
-| `features/decks/` | Presentation list, Zustand store, saving |
-| `features/editor/` | Editor: slide list, canvas with toolbar, drag and resize handles, slide settings, undo history |
-| `features/renderer/` | Pure, read-only `SlideRenderer`, shared by the canvas, thumbnails, print view and PNG export |
-| `features/ai/` | Chat and generation UI, stream protocol, model input schemas, deck context |
-| `features/export/` | Print view and PNG export |
-| `features/themes/` | Slide themes (design tokens) and theme picker |
-| `services/` | External systems: Sarvam and agents (`ai/`), Openverse image search (`images/`), browser storage (`localStorage/`, `indexedDb/`) |
-| `design-system/` | Shared UI components and charts (Recharts) |
-| `lib/` | Server environment, request parsing |
-| `testing/` | Test setup, fixtures, MSW handlers |
+| Folder               | Contents                                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`               | Routes: `/` (presentations), `/decks/[deckId]` (editor), `/decks/[deckId]/print`, and the API route handlers                     |
+| `features/deck/`     | Slide schema (zod), types, `DeckOperation` and `applyOperation`                                                                  |
+| `features/decks/`    | Presentation list, Zustand store, saving                                                                                         |
+| `features/editor/`   | Editor: slide list, canvas with toolbar, drag and resize handles, slide settings, undo history                                   |
+| `features/renderer/` | Pure, read-only `SlideRenderer`, shared by the canvas, thumbnails, print view and PNG export                                     |
+| `features/ai/`       | Chat and generation UI, stream protocol, model input schemas, deck context                                                       |
+| `features/export/`   | Print view and PNG export                                                                                                        |
+| `features/themes/`   | Slide themes (design tokens) and theme picker                                                                                    |
+| `services/`          | External systems: Sarvam and agents (`ai/`), Openverse image search (`images/`), browser storage (`localStorage/`, `indexedDb/`) |
+| `design-system/`     | Shared UI components and charts (Recharts)                                                                                       |
+| `lib/`               | Server environment, request parsing                                                                                              |
+| `testing/`           | Test setup, fixtures, MSW handlers                                                                                               |
 
 ### The slide schema
 
@@ -131,7 +179,7 @@ A deck has slides; a slide has a layout (`title`, `section`, `content`, `two-col
 - **Drag and drop and resizing** use `@dnd-kit/core` / `@dnd-kit/sortable` and `react-resizable-panels`, chosen for keyboard support and screen reader announcements.
 - **Generation is sequential**, one slide per model call, so each slide can be streamed and retried individually and a deck of up to 12 slides fits in Vercel's 300-second limit.
 
-A longer write-up of the design is in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+A longer write-up of the design is in [`docs/ImplementationPlan.md`](docs/ImplementationPlan.md).
 
 ## Known issues and limitations
 

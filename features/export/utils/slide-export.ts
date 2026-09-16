@@ -65,7 +65,7 @@ export async function captureSlidePng(node: HTMLElement): Promise<Blob> {
   }
 }
 
-export function downloadFile(blob: Blob, fileName: string): void {
+function downloadFile(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

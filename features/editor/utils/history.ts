@@ -7,7 +7,7 @@ export const HISTORY_LIMIT = 50;
 export const TYPING_MERGE_MS = 1000;
 
 /** One undo or redo step: where the deck still looks like `expected`, it goes back to `target`. */
-export type HistoryStep = { expected: Deck; target: Deck; group: ChangeGroup | null; at: number };
+type HistoryStep = { expected: Deck; target: Deck; group: ChangeGroup | null; at: number };
 
 export type DeckHistory = { past: HistoryStep[]; future: HistoryStep[] };
 

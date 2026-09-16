@@ -2,7 +2,7 @@ import { type Outline, type OutlineItem, SlideVisual } from "../types";
 import { GENERATION_LIMITS, outlineSchema } from "./slide-input";
 
 /** Outline item with a client-side id, so list items keep stable React keys while reordering. */
-export type EditableOutlineItem = OutlineItem & { id: string };
+type EditableOutlineItem = OutlineItem & { id: string };
 export type EditableOutline = { deckTitle: string; slides: EditableOutlineItem[] };
 
 export function toEditableOutline(outline: Outline): EditableOutline {

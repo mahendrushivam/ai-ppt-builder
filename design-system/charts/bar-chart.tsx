@@ -1,10 +1,23 @@
-import { Bar, CartesianGrid, Legend, BarChart as RechartsBarChart, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  CartesianGrid,
+  Legend,
+  BarChart as RechartsBarChart,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { ChartFrame } from "./chart-frame";
 import type { ChartProps } from "./types";
-import { CATEGORY_KEY, CHART_FRAME, colorAt, formatNumber, seriesKey, toRows } from "./utils";
+import {
+  CATEGORY_KEY,
+  CHART_FRAME,
+  colorAt,
+  formatNumber,
+  seriesKey,
+  toRows,
+} from "./utils";
 
 type BarChartProps = ChartProps & {
-  /** Stacks the series into one bar per category. */
   stacked?: boolean;
 };
 
@@ -15,7 +28,12 @@ export function BarChart({ data, colors, stacked = false }: BarChartProps) {
       <RechartsBarChart {...CHART_FRAME} data={toRows(data)}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey={CATEGORY_KEY} tickLine={false} />
-        <YAxis width={40} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
+        <YAxis
+          width={40}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={formatNumber}
+        />
         {data.series.map((series, index) => (
           <Bar
             key={index}
